@@ -2,6 +2,51 @@
 
 An open-source, local-first AI assistant for AAA game production pipelines.
 
+## Current Implementation Status
+
+The repository now contains the first local backend foundation for V1:
+
+- ASP.NET Core local API
+- project file scanning
+- source chunking
+- local embedding abstraction
+- semantic search
+- project-aware chat orchestration
+- local runtime status endpoint
+- local JSON-backed index repository
+- Ollama adapters for embeddings and chat
+- Unreal Editor plugin scaffold
+- UE 5.6 Win64 plugin build validation
+- automated unit test runner
+- developer and user documentation
+
+## Quick Start
+
+Build the solution:
+
+```powershell
+dotnet build GameProductionAIAssistant.slnx
+```
+
+Run tests:
+
+```powershell
+dotnet run --project GPAA.Tests\GPAA.Tests.csproj
+```
+
+Start the local backend:
+
+```powershell
+dotnet run --project GPAA.Api\GPAA.Api.csproj
+```
+
+Read the docs:
+
+- [Developer Guide](docs/developer-guide.md)
+- [User Guide](docs/user-guide.md)
+- [Local Backend API](docs/api.md)
+- [Unreal Editor Plugin](docs/unreal-plugin.md)
+
 ## Vision
 
 Game Production AI Assistant is a developer tooling platform designed to augment game developers, technical artists, and production teams working with modern game engines such as Unreal Engine.

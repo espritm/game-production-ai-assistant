@@ -1,0 +1,19 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Game Production AI Assistant",
+  "Description": "Local-first AI assistant integration for Unreal Engine production workflows.",
+  "Category": "AI",
+  "CreatedBy": "Game Production AI Assistant",
+  "CanContainContent": false,
+  "IsBetaVersion": true,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "GPAAssistant",
+      "Type": "Editor",
+      "LoadingPhase": "Default"
+    }
+  ]
+}

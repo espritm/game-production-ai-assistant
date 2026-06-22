@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="GPAA.Api/GPAA.Api.csproj" />
+  <Project Path="GPAA.Application/GPAA.Application.csproj" />
+  <Project Path="GPAA.Core/GPAA.Core.csproj" />
+  <Project Path="GPAA.Infrastructure/GPAA.Infrastructure.csproj" />
+  <Project Path="GPAA.Tests/GPAA.Tests.csproj" />
+</Solution>

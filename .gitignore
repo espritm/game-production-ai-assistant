@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.vscode/
+.gpaa/
+TestResults/
+*.user
+*.suo
+plugin/Binaries/
+plugin/Intermediate/
+plugin/Saved/
