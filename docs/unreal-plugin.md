@@ -14,9 +14,13 @@ Implemented actions:
 - configure backend URL;
 - check backend and Ollama runtime status;
 - detect the current Unreal project root;
-- request project indexing;
+- refresh the local project index automatically before search and ask requests;
+- run semantic search without invoking the chat model;
 - ask a project-aware question;
-- display the backend response.
+- load recent local chat history;
+- display search results separately from chat answers;
+- display answer source references as a dedicated list;
+- open referenced source files from result rows with a configurable source opener command.
 
 ## Install in an Unreal Project
 
@@ -62,6 +66,25 @@ The panel defaults to:
 http://localhost:5000
 ```
 
+The source opener defaults to `Auto`.
+
+Available modes:
+
+- `Auto`: tries Visual Studio Code, Rider, then Visual Studio, and falls back to the Windows default application.
+- `Visual Studio Code`: opens with line navigation when VS Code is installed in a standard location or `code` is available.
+- `Rider`: opens with line navigation when Rider is installed through JetBrains Toolbox or available as `rider`.
+- `Visual Studio`: opens the file in Visual Studio. Exact line navigation is limited by Visual Studio command-line support.
+- `Default Windows App`: opens the file with the associated Windows application.
+- `Custom Command`: uses a command template with `{file}` and `{line}` placeholders.
+
+The custom command default is:
+
+```txt
+code -g "{file}:{line}"
+```
+
+The selected mode and custom command are saved in the Unreal editor per-project user settings.
+
 Start the backend before using the plugin:
 
 ```powershell
@@ -74,14 +97,20 @@ dotnet run --project GPAA.Api\GPAA.Api.csproj --urls http://localhost:5000
 2. Start the local backend.
 3. Open the assistant panel from the Tools menu.
 4. Click `Check Backend`.
-5. Click `Index Project`.
-6. Ask a question.
+5. Use `Search` to inspect relevant source chunks.
+6. Use `Ask` when you want a model-generated answer grounded in those chunks.
+7. Use `History` to review recent local questions and answers for the project.
+
+`Search` and `Ask` automatically refresh the backend index first. The refresh is incremental, so unchanged files reuse existing chunks and embeddings.
+
+Search results and answer sources are displayed as separate lists. Each row includes the relative path, line range, similarity score, a short snippet, and an `Open` button. The button opens the referenced file from the configured project root with the workstation's default associated application.
 
 ## Current Limitations
 
 - The plugin does not start or supervise the backend process yet.
-- Responses are non-streaming.
-- Conversation history is not persisted in the editor UI.
+- The backend supports streaming chat, but the plugin uses the stable non-streaming chat path for now.
+- Conversation history is persisted locally by the backend and displayed as a text summary in the editor UI.
+- Exact line navigation depends on the selected source opener and editor support.
 - Error handling is intentionally simple for the first integration pass.
 
 ## Build Validation

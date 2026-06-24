@@ -14,6 +14,8 @@ public sealed class OllamaEmbeddingProvider : IEmbeddingProvider
         _options = options;
     }
 
+    public string ModelId => $"ollama:{_options.EmbeddingModel}";
+
     public async Task<IReadOnlyList<float>> EmbedAsync(string input, CancellationToken cancellationToken)
     {
         var response = await _httpClient.PostAsJsonAsync(

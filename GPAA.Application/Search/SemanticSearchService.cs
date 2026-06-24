@@ -1,3 +1,4 @@
+using GPAA.Application.Indexing;
 using GPAA.Application.Ports;
 using GPAA.Core.Projects;
 using GPAA.Core.Search;
@@ -8,11 +9,16 @@ public sealed class SemanticSearchService
 {
     private readonly IEmbeddingProvider _embeddingProvider;
     private readonly IKnowledgeRepository _repository;
+    private readonly ProjectIndexingService _indexingService;
 
-    public SemanticSearchService(IEmbeddingProvider embeddingProvider, IKnowledgeRepository repository)
+    public SemanticSearchService(
+        IEmbeddingProvider embeddingProvider,
+        IKnowledgeRepository repository,
+        ProjectIndexingService indexingService)
     {
         _embeddingProvider = embeddingProvider;
         _repository = repository;
+        _indexingService = indexingService;
     }
 
     public async Task<IReadOnlyList<SearchResult>> SearchAsync(SearchProjectRequest request, CancellationToken cancellationToken)
@@ -22,6 +28,7 @@ public sealed class SemanticSearchService
 
         var topK = Math.Clamp(request.TopK, 1, 50);
         var projectId = ProjectId.FromPath(request.ProjectRoot);
+        await _indexingService.IndexAsync(new IndexProjectRequest(projectId.Value), cancellationToken);
         var snapshot = await _repository.GetProjectIndexAsync(projectId, cancellationToken);
 
         if (snapshot is null || snapshot.Chunks.Count == 0)

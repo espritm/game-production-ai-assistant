@@ -25,12 +25,13 @@ public sealed class LocalKnowledgeRepository : IKnowledgeRepository
         IReadOnlyList<IndexedFile> files,
         IReadOnlyList<SourceChunk> chunks,
         IndexStatistics statistics,
+        ProjectIndexMetadata metadata,
         CancellationToken cancellationToken)
     {
         var path = GetProjectIndexPath(projectId);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        var document = new ProjectIndexDocument(files, chunks, statistics);
+        var document = new ProjectIndexDocument(files, chunks, statistics, metadata);
         var tempPath = path + ".tmp";
         await using (var stream = File.Create(tempPath))
         {
@@ -50,9 +51,19 @@ public sealed class LocalKnowledgeRepository : IKnowledgeRepository
 
         await using var stream = File.OpenRead(path);
         var document = await JsonSerializer.DeserializeAsync<ProjectIndexDocument>(stream, JsonOptions, cancellationToken);
-        return document is null
-            ? null
-            : new ProjectIndexSnapshot(document.Files, document.Chunks, document.Statistics);
+        if (document is null)
+        {
+            return null;
+        }
+
+        var statistics = document.Statistics ?? new IndexStatistics(
+            document.Files.Count,
+            document.Files.Count,
+            document.Chunks.Count,
+            DateTimeOffset.UtcNow);
+
+        var metadata = document.Metadata ?? ProjectIndexMetadata.Legacy(statistics.IndexedAt);
+        return new ProjectIndexSnapshot(document.Files, document.Chunks, statistics, metadata);
     }
 
     private string GetProjectIndexPath(ProjectId projectId)
@@ -64,5 +75,6 @@ public sealed class LocalKnowledgeRepository : IKnowledgeRepository
     private sealed record ProjectIndexDocument(
         IReadOnlyList<IndexedFile> Files,
         IReadOnlyList<SourceChunk> Chunks,
-        IndexStatistics Statistics);
+        IndexStatistics? Statistics,
+        ProjectIndexMetadata? Metadata);
 }

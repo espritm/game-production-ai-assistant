@@ -30,9 +30,11 @@ http://localhost:5000/health
 
 If ASP.NET selects another port, use the URL printed in the terminal.
 
-## Index a Project
+## Automatic Project Indexing
 
-Send a request to the local backend:
+The backend indexes projects automatically before `Search` and `Ask` requests. No manual indexing step is required in the Unreal plugin.
+
+The manual endpoint remains available for diagnostics or scripts:
 
 ```powershell
 curl.exe -X POST http://localhost:5000/projects/index `
@@ -45,6 +47,8 @@ The backend scans supported files and stores a local index under:
 ```txt
 .gpaa/indexes
 ```
+
+Indexing is incremental. When the same embedding model is still configured, unchanged files are reused from the previous JSON index and only new or modified files are embedded again. Deleted files are removed from the refreshed index. If you change the embedding model, the next search, ask, or manual indexing run performs a full rebuild so search vectors stay compatible.
 
 ## Check Index Status
 
@@ -62,6 +66,27 @@ curl.exe -X POST http://localhost:5000/search `
 
 The response includes matching source chunks with file paths, line ranges, and similarity scores.
 
+The Unreal plugin exposes the same workflow through the `Search` button. Search uses embeddings only and does not call the chat model. Results appear in a dedicated list with an `Open` button for each referenced file.
+
+Source rows can be opened through the plugin's configurable source opener. The default mode is `Auto`, which tries common local editor installations before falling back to the Windows default application.
+
+Available modes are:
+
+- `Auto`
+- `Visual Studio Code`
+- `Rider`
+- `Visual Studio`
+- `Default Windows App`
+- `Custom Command`
+
+The custom command default is:
+
+```txt
+code -g "{file}:{line}"
+```
+
+You can replace it with another editor command that supports `{file}` and `{line}` placeholders. The selected mode and custom command are saved in the Unreal editor per-project user settings.
+
 ## Ask a Question
 
 ```powershell
@@ -70,7 +95,13 @@ curl.exe -X POST http://localhost:5000/chat `
   -d "{\"projectRoot\":\"C:\\Path\\To\\YourUnrealProject\",\"question\":\"Where is stamina regeneration handled?\",\"topK\":5}"
 ```
 
-By default, chat runs in echo mode so you can validate indexing and context retrieval without installing a model.
+The response includes an answer and the source chunks used as context. In the Unreal plugin, the answer and its sources are displayed separately so that source files can be opened without digging through the generated text.
+
+The backend also exposes `POST /chat/stream` for streaming answer fragments as Server-Sent Events. The current Unreal plugin keeps the stable non-streaming request path, while the backend API is ready for streaming clients.
+
+## Chat History
+
+Each completed `Ask` request is stored locally in JSON under the backend storage root. The Unreal plugin includes a `History` button that loads recent local questions and answers for the current project.
 
 ## Enable Ollama
 
@@ -103,6 +134,8 @@ You can replace `ChatModel` with any installed Ollama chat model. On the current
 erwan2/DeepSeek-R1-Distill-Qwen-7B:latest
 ```
 
+If you replace `EmbeddingModel`, the backend records the embedding model inside the local index and rebuilds automatically when it detects a mismatch.
+
 ## Check Runtime Status
 
 The backend exposes a runtime status endpoint:
@@ -123,7 +156,7 @@ See [Unreal Editor Plugin](unreal-plugin.md) for installation and usage.
 
 ## Current Limitations
 
-- The Unreal Editor plugin is an initial integration scaffold.
-- Streaming responses are not implemented yet.
+- The Unreal Editor plugin is an initial integration scaffold with separate search, answer, and source sections.
+- The backend supports streaming chat over Server-Sent Events; the Unreal plugin still uses the stable non-streaming chat call.
 - The storage adapter uses a local JSON store behind a repository interface.
 - Blueprint and asset metadata indexing are not included in this version.

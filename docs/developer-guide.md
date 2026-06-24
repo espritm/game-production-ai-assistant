@@ -45,6 +45,10 @@ The codebase is intentionally small and explicit.
 
 `ProjectIndexingService` scans supported files, chunks content, generates embeddings, and persists a project index.
 
+Indexing is incremental. The JSON index stores `ProjectIndexMetadata`, including the embedding model id used to generate vectors. When the current provider model id matches the stored metadata, unchanged files are detected by content hash and their chunks are reused. If the model id changes, the service performs a full rebuild so vector dimensions and semantic meaning cannot drift across providers.
+
+`SourceContextExtractor` adds lightweight Unreal/C++ context before embedding chunks. It extracts nearby class, struct, enum, Unreal macro, function, and `.Build.cs` module rule declarations so semantic search has stronger signals than raw line chunks alone.
+
 Supported source files:
 
 - `.h`
@@ -65,15 +69,21 @@ Ignored directories:
 
 ### Semantic Search
 
-`SemanticSearchService` embeds the user query and ranks indexed chunks with cosine similarity.
+`SemanticSearchService` refreshes the project index first, embeds the user query, and ranks indexed chunks with cosine similarity. The refresh delegates to `ProjectIndexingService`, so modified files are embedded before results are returned.
 
 ### Project Chat
 
 `ProjectChatService` retrieves semantic context, builds a grounded prompt, and calls the configured chat provider.
 
+Completed chat requests are stored through `IChatHistoryRepository`. The V1 adapter is `LocalChatHistoryRepository`, which keeps recent entries in JSON next to the project index.
+
+`IStreamingChatCompletionProvider` exposes streaming chat. `OllamaChatCompletionProvider` reads Ollama's streaming JSON lines, and `POST /chat/stream` forwards fragments as Server-Sent Events.
+
 ## Storage
 
 The current V1 implementation uses `LocalKnowledgeRepository`, an atomic JSON-backed local store. JSON is the preferred storage format for the current phase because it is simple to inspect, easy to debug, and dependency-free.
+
+The repository remains backward-compatible with earlier JSON index files. Legacy indexes without metadata are loaded as `legacy-unknown` and rebuilt on the next indexing run.
 
 Default storage path:
 
@@ -129,7 +139,11 @@ Current coverage includes:
 - source chunking with overlap;
 - vector similarity ranking;
 - Unreal generated directory filtering;
-- end-to-end indexing and semantic search.
+- end-to-end indexing and semantic search;
+- incremental index reuse;
+- automatic search-time refresh after file changes;
+- embedding model mismatch rebuilds;
+- local chat history persistence.
 
 ## API Project
 

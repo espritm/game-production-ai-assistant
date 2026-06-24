@@ -16,6 +16,7 @@ public class GPAAssistant : ModuleRules
             "CoreUObject",
             "Engine",
             "HTTP",
+            "InputCore",
             "Json",
             "JsonUtilities",
             "Projects",

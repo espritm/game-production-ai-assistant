@@ -7,6 +7,7 @@ public static class SupportedSourceFile
         ".h",
         ".hpp",
         ".cpp",
+        ".cs",
         ".ini",
         ".uplugin",
         ".uproject"

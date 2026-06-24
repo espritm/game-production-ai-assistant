@@ -20,6 +20,8 @@ public sealed partial class DeterministicEmbeddingProvider : IEmbeddingProvider
         _dimensions = dimensions;
     }
 
+    public string ModelId => $"deterministic-hash-v1:{_dimensions}";
+
     public Task<IReadOnlyList<float>> EmbedAsync(string input, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

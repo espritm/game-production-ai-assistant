@@ -11,6 +11,7 @@ public interface IKnowledgeRepository
         IReadOnlyList<IndexedFile> files,
         IReadOnlyList<SourceChunk> chunks,
         IndexStatistics statistics,
+        ProjectIndexMetadata metadata,
         CancellationToken cancellationToken);
 
     Task<ProjectIndexSnapshot?> GetProjectIndexAsync(ProjectId projectId, CancellationToken cancellationToken);

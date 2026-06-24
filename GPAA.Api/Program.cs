@@ -17,8 +17,10 @@ var storageRoot = builder.Configuration.GetValue<string>("Storage:Root")
 
 builder.Services.AddSingleton(ollamaOptions);
 builder.Services.AddSingleton(new SourceChunker());
+builder.Services.AddSingleton(new SourceContextExtractor());
 builder.Services.AddSingleton<IProjectFileScanner, LocalProjectFileScanner>();
 builder.Services.AddSingleton<IKnowledgeRepository>(_ => new LocalKnowledgeRepository(storageRoot));
+builder.Services.AddSingleton<IChatHistoryRepository>(_ => new LocalChatHistoryRepository(storageRoot));
 builder.Services.AddSingleton(_ =>
 {
     var httpClient = new HttpClient { BaseAddress = new Uri(ollamaOptions.BaseUrl) };
@@ -46,6 +48,9 @@ builder.Services.AddSingleton<IChatCompletionProvider>(services =>
     var httpClient = new HttpClient { BaseAddress = new Uri(ollamaOptions.BaseUrl) };
     return new OllamaChatCompletionProvider(httpClient, ollamaOptions);
 });
+
+builder.Services.AddSingleton<IStreamingChatCompletionProvider>(services =>
+    (IStreamingChatCompletionProvider)services.GetRequiredService<IChatCompletionProvider>());
 
 builder.Services.AddSingleton<ProjectIndexingService>();
 builder.Services.AddSingleton<SemanticSearchService>();
@@ -102,14 +107,41 @@ app.MapPost("/chat", async (
     ProjectChatService chatService,
     CancellationToken cancellationToken) =>
 {
-    var answer = await chatService.AskAsync(request, cancellationToken);
-    return Results.Ok(new ChatResponse(answer));
+    var response = await chatService.AskAsync(request, cancellationToken);
+    return Results.Ok(response);
+});
+
+app.MapPost("/chat/stream", async (
+    ChatProjectRequest request,
+    ProjectChatService chatService,
+    HttpContext httpContext,
+    CancellationToken cancellationToken) =>
+{
+    httpContext.Response.Headers.ContentType = "text/event-stream";
+    await foreach (var fragment in chatService.AskStreamAsync(request, cancellationToken))
+    {
+        await httpContext.Response.WriteAsync($"data: {fragment.Replace("\r", string.Empty).Replace("\n", "\\n")}\n\n", cancellationToken);
+        await httpContext.Response.Body.FlushAsync(cancellationToken);
+    }
+});
+
+app.MapGet("/chat/history", async (
+    string projectRoot,
+    int? limit,
+    IChatHistoryRepository historyRepository,
+    CancellationToken cancellationToken) =>
+{
+    var entries = await historyRepository.ListAsync(
+        ProjectId.FromPath(projectRoot),
+        limit.GetValueOrDefault(20),
+        cancellationToken);
+
+    return Results.Ok(entries);
 });
 
 app.Run();
 
 public sealed record HealthResponse(string Status, DateTimeOffset CheckedAt);
-public sealed record ChatResponse(string Answer);
 public sealed record RuntimeStatusResponse(
     string Backend,
     DateTimeOffset CheckedAt,

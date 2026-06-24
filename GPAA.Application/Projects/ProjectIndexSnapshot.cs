@@ -6,4 +6,5 @@ namespace GPAA.Application.Projects;
 public sealed record ProjectIndexSnapshot(
     IReadOnlyList<IndexedFile> Files,
     IReadOnlyList<SourceChunk> Chunks,
-    IndexStatistics Statistics);
+    IndexStatistics Statistics,
+    ProjectIndexMetadata Metadata);

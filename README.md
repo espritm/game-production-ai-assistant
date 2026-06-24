@@ -11,7 +11,9 @@ The repository now contains the first local backend foundation for V1:
 - source chunking
 - local embedding abstraction
 - semantic search
+- Unreal semantic search panel
 - project-aware chat orchestration
+- structured chat sources
 - local runtime status endpoint
 - local JSON-backed index repository
 - Ollama adapters for embeddings and chat

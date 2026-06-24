@@ -59,7 +59,14 @@ Response:
   "filesScanned": 42,
   "filesIndexed": 42,
   "chunksIndexed": 120,
-  "indexedAt": "2026-06-21T00:00:00Z"
+  "indexedAt": "2026-06-21T00:00:00Z",
+  "filesReused": 40,
+  "filesChanged": 2,
+  "filesRemoved": 1,
+  "chunksReused": 116,
+  "chunksEmbedded": 4,
+  "fullRebuild": false,
+  "embeddingModel": "ollama:nomic-embed-text"
 }
 ```
 
@@ -73,9 +80,13 @@ Query string:
 projectRoot=C:\Path\To\Project
 ```
 
+The response uses the same statistics shape as `POST /projects/index`.
+
 ## `POST /search`
 
 Runs semantic search against an indexed project.
+
+Before ranking results, the backend refreshes the project index incrementally. Unchanged files reuse existing chunks and embeddings; changed files are re-embedded.
 
 Request:
 
@@ -106,6 +117,8 @@ Response:
 
 Asks a project-aware question.
 
+Chat uses semantic search internally, so it also refreshes the project index incrementally before building context.
+
 Request:
 
 ```json
@@ -116,10 +129,56 @@ Request:
 }
 ```
 
+## `POST /chat/stream`
+
+Streams a project-aware answer as Server-Sent Events. It refreshes the project index before generating context, like `POST /chat`.
+
+Request:
+
+```json
+{
+  "projectRoot": "C:\\Path\\To\\Project",
+  "question": "Where is stamina regeneration handled?",
+  "topK": 5
+}
+```
+
+Response content type:
+
+```txt
+text/event-stream
+```
+
+Each event contains an answer fragment:
+
+```txt
+data: partial answer text
+```
+
+## `GET /chat/history`
+
+Returns recent locally stored chat entries for a project.
+
+Query string:
+
+```txt
+projectRoot=C:\Path\To\Project&limit=20
+```
+
 Response:
 
 ```json
 {
-  "answer": "..."
+  "answer": "...",
+  "sources": [
+    {
+      "chunkId": "hash:1:40",
+      "relativePath": "Source/Game/StaminaComponent.cpp",
+      "startLine": 1,
+      "endLine": 40,
+      "content": "...",
+      "score": 0.82
+    }
+  ]
 }
 ```

@@ -3,7 +3,7 @@ using GPAA.Core.Chat;
 
 namespace GPAA.Infrastructure.Inference;
 
-public sealed class ContextEchoChatCompletionProvider : IChatCompletionProvider
+public sealed class ContextEchoChatCompletionProvider : IChatCompletionProvider, IStreamingChatCompletionProvider
 {
     public Task<string> CompleteAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken)
     {
@@ -18,5 +18,12 @@ public sealed class ContextEchoChatCompletionProvider : IChatCompletionProvider
             + prompt;
 
         return Task.FromResult(answer);
+    }
+
+    public async IAsyncEnumerable<string> CompleteStreamAsync(
+        IReadOnlyList<ChatMessage> messages,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        yield return await CompleteAsync(messages, cancellationToken);
     }
 }
