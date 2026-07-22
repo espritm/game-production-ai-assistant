@@ -13,13 +13,16 @@ public class GPAAssistant : ModuleRules
 
         PrivateDependencyModuleNames.AddRange(new[]
         {
+            "AssetRegistry",
             "CoreUObject",
+            "DeveloperSettings",
             "Engine",
             "HTTP",
             "InputCore",
             "Json",
             "JsonUtilities",
             "Projects",
+            "Settings",
             "Slate",
             "SlateCore",
             "ToolMenus",

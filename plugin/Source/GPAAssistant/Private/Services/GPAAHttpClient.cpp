@@ -1,9 +1,10 @@
 #include "Services/GPAAHttpClient.h"
 
-#include "Dom/JsonObject.h"
 #include "GenericPlatform/GenericPlatformHttp.h"
-#include "Serialization/JsonSerializer.h"
-#include "Serialization/JsonWriter.h"
+#include "Logging/LogMacros.h"
+#include "Models/GPAAApiModels.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogGPAAHttpClient, Log, All);
 
 void FGPAAHttpClient::CheckBackend(const FString& BackendUrl, FGPAARequestCompleted OnCompleted)
 {
@@ -25,6 +26,53 @@ void FGPAAHttpClient::IndexProject(const FString& BackendUrl, const FString& Pro
     }));
 }
 
+void FGPAAHttpClient::SyncUnrealAssetMetadata(const FString& BackendUrl, const FString& RequestBody, FGPAARequestCompleted OnCompleted)
+{
+    PostJson(BackendUrl, TEXT("/projects/assets/metadata"), RequestBody, OnCompleted);
+}
+
+void FGPAAHttpClient::GetKnowledgeStatus(const FString& BackendUrl, const FString& ProjectRoot, FGPAARequestCompleted OnCompleted)
+{
+    const FString Route = FString::Printf(
+        TEXT("/projects/knowledge/status?projectRoot=%s"),
+        *FGenericPlatformHttp::UrlEncode(ProjectRoot));
+
+    GetJson(BackendUrl, Route, OnCompleted);
+}
+
+void FGPAAHttpClient::GetChatSettings(const FString& BackendUrl, FGPAARequestCompleted OnCompleted)
+{
+    GetJson(BackendUrl, TEXT("/runtime/chat-settings"), OnCompleted);
+}
+
+void FGPAAHttpClient::SaveChatSettings(const FString& BackendUrl, const FString& RequestBody, FGPAARequestCompleted OnCompleted)
+{
+    PostJson(BackendUrl, TEXT("/runtime/chat-settings"), RequestBody, OnCompleted);
+}
+
+void FGPAAHttpClient::TestChatProvider(const FString& BackendUrl, FGPAARequestCompleted OnCompleted)
+{
+    PostJson(BackendUrl, TEXT("/runtime/chat-provider/test"), TEXT("{}"), FGPAARequestCompleted::CreateLambda([OnCompleted](bool bSucceeded, const FString& Message)
+    {
+        if (!bSucceeded)
+        {
+            OnCompleted.ExecuteIfBound(false, Message);
+            return;
+        }
+
+        FGPAAChatProviderTestResult Result;
+        if (!FGPAAApiModels::ParseChatProviderTestResult(Message, Result))
+        {
+            OnCompleted.ExecuteIfBound(false, TEXT("The backend returned an unexpected provider test response."));
+            return;
+        }
+
+        const FString ModelSuffix = Result.Model.IsEmpty() ? FString() : FString::Printf(TEXT(" (%s)"), *Result.Model);
+        const FString Confirmation = Result.Message.IsEmpty() ? TEXT("Provider responded.") : Result.Message;
+        OnCompleted.ExecuteIfBound(true, FString::Printf(TEXT("%s%s is ready. %s"), *Result.Provider, *ModelSuffix, *Confirmation));
+    }));
+}
+
 void FGPAAHttpClient::GetChatHistory(const FString& BackendUrl, const FString& ProjectRoot, FGPAARequestCompleted OnCompleted)
 {
     const FString Route = FString::Printf(
@@ -39,10 +87,10 @@ void FGPAAHttpClient::GetChatHistory(const FString& BackendUrl, const FString& P
             return;
         }
 
-        FString FormattedHistory;
-        if (FormatChatHistory(Message, FormattedHistory))
+        TArray<FGPAAChatHistoryEntry> Entries;
+        if (FGPAAApiModels::ParseChatHistoryResponse(Message, Entries))
         {
-            OnCompleted.ExecuteIfBound(true, FormattedHistory);
+            OnCompleted.ExecuteIfBound(true, FormatChatHistory(Entries));
             return;
         }
 
@@ -50,12 +98,13 @@ void FGPAAHttpClient::GetChatHistory(const FString& BackendUrl, const FString& P
     }));
 }
 
-void FGPAAHttpClient::SearchProject(const FString& BackendUrl, const FString& ProjectRoot, const FString& Query, FGPAASearchCompleted OnCompleted)
+void FGPAAHttpClient::SearchProject(const FString& BackendUrl, const FString& ProjectRoot, const FString& Query, const FString& SourceFilter, FGPAASearchCompleted OnCompleted)
 {
     const FString Body = FString::Printf(
-        TEXT("{\"projectRoot\":\"%s\",\"query\":\"%s\",\"topK\":8}"),
+        TEXT("{\"projectRoot\":\"%s\",\"query\":\"%s\",\"topK\":8,\"sourceFilter\":\"%s\"}"),
         *ProjectRoot.ReplaceCharWithEscapedChar(),
-        *Query.ReplaceCharWithEscapedChar());
+        *Query.ReplaceCharWithEscapedChar(),
+        *SourceFilter.ReplaceCharWithEscapedChar());
 
     PostJson(BackendUrl, TEXT("/search"), Body, FGPAARequestCompleted::CreateLambda([OnCompleted](bool bSucceeded, const FString& Message)
     {
@@ -65,14 +114,14 @@ void FGPAAHttpClient::SearchProject(const FString& BackendUrl, const FString& Pr
             return;
         }
 
-        TArray<FGPAASourceReference> Results;
-        if (ParseSearchResults(Message, Results))
+        FGPAASearchResponse Response;
+        if (FGPAAApiModels::ParseSearchResponse(Message, Response))
         {
-            const FString DisplayMessage = Results.IsEmpty()
+            const FString DisplayMessage = Response.Results.IsEmpty()
                 ? TEXT("No matching source chunks were found.")
-                : FString::Printf(TEXT("%d matching source chunk(s) found."), Results.Num());
+                : FString::Printf(TEXT("%d matching source chunk(s) found."), Response.Results.Num());
 
-            OnCompleted.ExecuteIfBound(true, DisplayMessage, Results);
+            OnCompleted.ExecuteIfBound(true, DisplayMessage, Response.Results);
             return;
         }
 
@@ -80,12 +129,13 @@ void FGPAAHttpClient::SearchProject(const FString& BackendUrl, const FString& Pr
     }));
 }
 
-void FGPAAHttpClient::AskQuestion(const FString& BackendUrl, const FString& ProjectRoot, const FString& Question, FGPAAChatCompleted OnCompleted)
+void FGPAAHttpClient::AskQuestion(const FString& BackendUrl, const FString& ProjectRoot, const FString& Question, const FString& SourceFilter, FGPAAChatCompleted OnCompleted)
 {
     const FString Body = FString::Printf(
-        TEXT("{\"projectRoot\":\"%s\",\"question\":\"%s\",\"topK\":4}"),
+        TEXT("{\"projectRoot\":\"%s\",\"question\":\"%s\",\"topK\":4,\"sourceFilter\":\"%s\"}"),
         *ProjectRoot.ReplaceCharWithEscapedChar(),
-        *Question.ReplaceCharWithEscapedChar());
+        *Question.ReplaceCharWithEscapedChar(),
+        *SourceFilter.ReplaceCharWithEscapedChar());
 
     PostJson(BackendUrl, TEXT("/chat"), Body, FGPAARequestCompleted::CreateLambda([OnCompleted](bool bSucceeded, const FString& Message)
     {
@@ -95,13 +145,10 @@ void FGPAAHttpClient::AskQuestion(const FString& BackendUrl, const FString& Proj
             return;
         }
 
-        FString Answer;
-        if (ExtractMessage(Message, TEXT("answer"), Answer))
+        FGPAAChatResponse Response;
+        if (FGPAAApiModels::ParseChatResponse(Message, Response))
         {
-            TArray<FGPAASourceReference> Sources;
-            ExtractSources(Message, Sources);
-
-            OnCompleted.ExecuteIfBound(true, TEXT("Answer generated."), Answer, Sources);
+            OnCompleted.ExecuteIfBound(true, TEXT("Answer generated."), Response.Answer, Response.Sources);
             return;
         }
 
@@ -128,25 +175,31 @@ void FGPAAHttpClient::SendJsonRequest(const FString& BackendUrl, const FString& 
     Request->SetVerb(Verb);
     Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
     Request->SetTimeout(300.0f);
+    Request->SetActivityTimeout(300.0f);
     if (!Body.IsEmpty())
     {
         Request->SetContentAsString(Body);
     }
 
-    Request->OnProcessRequestComplete().BindLambda([OnCompleted](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
+    UE_LOG(LogGPAAHttpClient, Log, TEXT("%s %s body=%d chars"), *Verb, *Url, Body.Len());
+
+    Request->OnProcessRequestComplete().BindLambda([OnCompleted, Url, Verb](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
     {
         if (!bWasSuccessful || !Response.IsValid())
         {
+            UE_LOG(LogGPAAHttpClient, Warning, TEXT("%s %s failed before a valid HTTP response."), *Verb, *Url);
             OnCompleted.ExecuteIfBound(false, TEXT("The local backend did not respond."));
             return;
         }
 
         const int32 StatusCode = Response->GetResponseCode();
         const FString ResponseBody = Response->GetContentAsString();
+        UE_LOG(LogGPAAHttpClient, Log, TEXT("%s %s completed with HTTP %d, response=%d chars"), *Verb, *Url, StatusCode, ResponseBody.Len());
 
         if (StatusCode < 200 || StatusCode >= 300)
         {
-            OnCompleted.ExecuteIfBound(false, FString::Printf(TEXT("HTTP %d: %s"), StatusCode, *ResponseBody));
+            UE_LOG(LogGPAAHttpClient, Warning, TEXT("%s %s returned HTTP %d: %s"), *Verb, *Url, StatusCode, *ResponseBody.Left(1000));
+            OnCompleted.ExecuteIfBound(false, FGPAAApiModels::FormatHttpError(StatusCode, ResponseBody));
             return;
         }
 
@@ -170,173 +223,20 @@ FString FGPAAHttpClient::NormalizeBackendUrl(const FString& BackendUrl)
     return Normalized.IsEmpty() ? TEXT("http://localhost:5000") : Normalized;
 }
 
-bool FGPAAHttpClient::ExtractMessage(const FString& ResponseBody, const FString& FieldName, FString& OutMessage)
+FString FGPAAHttpClient::FormatChatHistory(const TArray<FGPAAChatHistoryEntry>& Entries)
 {
-    TSharedPtr<FJsonObject> JsonObject;
-    const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseBody);
-
-    if (!FJsonSerializer::Deserialize(Reader, JsonObject) || !JsonObject.IsValid())
-    {
-        return false;
-    }
-
-    return JsonObject->TryGetStringField(FieldName, OutMessage);
-}
-
-bool FGPAAHttpClient::ExtractSources(const FString& ResponseBody, TArray<FGPAASourceReference>& OutSources)
-{
-    TSharedPtr<FJsonObject> JsonObject;
-    const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseBody);
-
-    if (!FJsonSerializer::Deserialize(Reader, JsonObject) || !JsonObject.IsValid())
-    {
-        return false;
-    }
-
-    const TArray<TSharedPtr<FJsonValue>>* Sources = nullptr;
-    if (!JsonObject->TryGetArrayField(TEXT("sources"), Sources))
-    {
-        return false;
-    }
-
-    for (const TSharedPtr<FJsonValue>& SourceValue : *Sources)
-    {
-        const TSharedPtr<FJsonObject> SourceObject = SourceValue->AsObject();
-        if (!SourceObject.IsValid())
-        {
-            continue;
-        }
-
-        FGPAASourceReference Source;
-
-        SourceObject->TryGetStringField(TEXT("relativePath"), Source.RelativePath);
-        SourceObject->TryGetStringField(TEXT("content"), Source.Content);
-        SourceObject->TryGetNumberField(TEXT("startLine"), Source.StartLine);
-        SourceObject->TryGetNumberField(TEXT("endLine"), Source.EndLine);
-        SourceObject->TryGetNumberField(TEXT("score"), Source.Score);
-
-        if (!Source.RelativePath.IsEmpty())
-        {
-            OutSources.Add(Source);
-        }
-    }
-
-    return !OutSources.IsEmpty();
-}
-
-bool FGPAAHttpClient::FormatChatHistory(const FString& ResponseBody, FString& OutMessage)
-{
-    TArray<TSharedPtr<FJsonValue>> Entries;
-    const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseBody);
-
-    if (!FJsonSerializer::Deserialize(Reader, Entries))
-    {
-        return false;
-    }
-
     if (Entries.IsEmpty())
     {
-        OutMessage = TEXT("No local chat history yet.");
-        return true;
+        return TEXT("No local chat history yet.");
     }
 
     TArray<FString> Lines;
     Lines.Add(TEXT("Recent local chat history:"));
 
-    for (const TSharedPtr<FJsonValue>& EntryValue : Entries)
+    for (const FGPAAChatHistoryEntry& Entry : Entries)
     {
-        const TSharedPtr<FJsonObject> EntryObject = EntryValue->AsObject();
-        if (!EntryObject.IsValid())
-        {
-            continue;
-        }
-
-        FString Question;
-        FString Answer;
-        FString CreatedAt;
-        EntryObject->TryGetStringField(TEXT("question"), Question);
-        EntryObject->TryGetStringField(TEXT("answer"), Answer);
-        EntryObject->TryGetStringField(TEXT("createdAt"), CreatedAt);
-
-        Answer = CollapseWhitespace(Answer);
-        if (Answer.Len() > 360)
-        {
-            Answer = Answer.Left(360) + TEXT("...");
-        }
-
-        Lines.Add(FString::Printf(TEXT("\n%s\nQ: %s\nA: %s"), *CreatedAt, *Question, *Answer));
+        Lines.Add(FString::Printf(TEXT("\n%s\nQ: %s\nA: %s"), *Entry.CreatedAt, *Entry.Question, *Entry.Answer));
     }
 
-    OutMessage = FString::Join(Lines, TEXT("\n"));
-    return true;
-}
-
-bool FGPAAHttpClient::ParseSearchResults(const FString& ResponseBody, TArray<FGPAASourceReference>& OutResults)
-{
-    TArray<TSharedPtr<FJsonValue>> Results;
-    const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ResponseBody);
-
-    if (!FJsonSerializer::Deserialize(Reader, Results))
-    {
-        return false;
-    }
-
-    for (const TSharedPtr<FJsonValue>& ResultValue : Results)
-    {
-        const TSharedPtr<FJsonObject> ResultObject = ResultValue->AsObject();
-        if (!ResultObject.IsValid())
-        {
-            continue;
-        }
-
-        FGPAASourceReference Result;
-
-        ResultObject->TryGetStringField(TEXT("relativePath"), Result.RelativePath);
-        ResultObject->TryGetStringField(TEXT("content"), Result.Content);
-        ResultObject->TryGetNumberField(TEXT("startLine"), Result.StartLine);
-        ResultObject->TryGetNumberField(TEXT("endLine"), Result.EndLine);
-        ResultObject->TryGetNumberField(TEXT("score"), Result.Score);
-
-        if (Result.RelativePath.IsEmpty())
-        {
-            continue;
-        }
-
-        Result.Content = CollapseWhitespace(Result.Content);
-        if (Result.Content.Len() > 420)
-        {
-            Result.Content = Result.Content.Left(420) + TEXT("...");
-        }
-
-        OutResults.Add(Result);
-    }
-
-    return true;
-}
-
-FString FGPAAHttpClient::CollapseWhitespace(const FString& Text)
-{
-    FString Result;
-    Result.Reserve(Text.Len());
-
-    bool bPreviousWasWhitespace = false;
-    for (TCHAR Character : Text)
-    {
-        const bool bIsWhitespace = FChar::IsWhitespace(Character);
-        if (bIsWhitespace)
-        {
-            if (!bPreviousWasWhitespace)
-            {
-                Result.AppendChar(TEXT(' '));
-            }
-        }
-        else
-        {
-            Result.AppendChar(Character);
-        }
-
-        bPreviousWasWhitespace = bIsWhitespace;
-    }
-
-    return Result.TrimStartAndEnd();
+    return FString::Join(Lines, TEXT("\n"));
 }

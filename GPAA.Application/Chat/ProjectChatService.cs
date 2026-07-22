@@ -8,6 +8,10 @@ namespace GPAA.Application.Chat;
 
 public sealed class ProjectChatService
 {
+    private const int MaxChatSources = 2;
+    private const int MaxSourceCharacters = 700;
+    private const int MaxTotalContextCharacters = 1600;
+
     private readonly SemanticSearchService _searchService;
     private readonly IChatCompletionProvider _chatCompletionProvider;
     private readonly IStreamingChatCompletionProvider _streamingChatCompletionProvider;
@@ -30,10 +34,10 @@ public sealed class ProjectChatService
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Question);
 
         var results = await _searchService.SearchAsync(
-            new SearchProjectRequest(request.ProjectRoot, request.Question, request.TopK),
+            new SearchProjectRequest(request.ProjectRoot, request.Question, request.TopK, request.SourceFilter),
             cancellationToken);
 
-        var prompt = BuildPrompt(request.Question, results);
+        var prompt = BuildPrompt(request.Question, results.Take(MaxChatSources).ToArray());
         var messages = new[]
         {
             new ChatMessage("system", "You are a local-first AI assistant for Unreal Engine production projects. Answer with concise technical guidance and cite file references when context is available."),
@@ -62,10 +66,10 @@ public sealed class ProjectChatService
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Question);
 
         var results = await _searchService.SearchAsync(
-            new SearchProjectRequest(request.ProjectRoot, request.Question, request.TopK),
+            new SearchProjectRequest(request.ProjectRoot, request.Question, request.TopK, request.SourceFilter),
             cancellationToken);
 
-        var prompt = BuildPrompt(request.Question, results);
+        var prompt = BuildPrompt(request.Question, results.Take(MaxChatSources).ToArray());
         var messages = new[]
         {
             new ChatMessage("system", "You are a local-first AI assistant for Unreal Engine production projects. Answer with concise technical guidance and cite file references when context is available."),
@@ -105,18 +109,38 @@ public sealed class ProjectChatService
         }
         else
         {
-            foreach (var result in results)
+            var totalContextCharacters = 0;
+            foreach (var result in results.Take(MaxChatSources))
             {
+                if (totalContextCharacters >= MaxTotalContextCharacters)
+                {
+                    break;
+                }
+
+                var content = LimitSourceContent(result.Content, Math.Min(MaxSourceCharacters, MaxTotalContextCharacters - totalContextCharacters));
+                totalContextCharacters += content.Length;
+
                 builder.AppendLine($"Source: {result.RelativePath}:{result.StartLine}-{result.EndLine}");
-                builder.AppendLine(result.Content);
+                builder.AppendLine(content);
                 builder.AppendLine();
             }
         }
 
+        builder.AppendLine("Answer in at most 8 concise bullet points.");
         builder.AppendLine("Answer using only the provided context.");
         builder.AppendLine("If no source directly supports the answer, say that no matching implementation was found.");
         builder.AppendLine("Do not invent systems, files, classes, or engine behavior that is not present in the sources.");
         builder.AppendLine("When a source supports a claim, cite it as Source: relative/path:start-end.");
         return builder.ToString();
+    }
+
+    private static string LimitSourceContent(string content, int maxCharacters)
+    {
+        if (content.Length <= maxCharacters)
+        {
+            return content;
+        }
+
+        return content[..maxCharacters] + Environment.NewLine + "[Source truncated for local chat performance.]";
     }
 }

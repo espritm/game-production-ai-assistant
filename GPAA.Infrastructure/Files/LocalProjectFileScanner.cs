@@ -8,6 +8,8 @@ namespace GPAA.Infrastructure.Files;
 
 public sealed class LocalProjectFileScanner : IProjectFileScanner
 {
+    private readonly UnrealAssetMetadataExtractor _assetMetadataExtractor;
+
     private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git",
@@ -17,6 +19,16 @@ public sealed class LocalProjectFileScanner : IProjectFileScanner
         "Intermediate",
         "Saved"
     };
+
+    public LocalProjectFileScanner()
+        : this(new UnrealAssetMetadataExtractor())
+    {
+    }
+
+    public LocalProjectFileScanner(UnrealAssetMetadataExtractor assetMetadataExtractor)
+    {
+        _assetMetadataExtractor = assetMetadataExtractor;
+    }
 
     public async Task<IReadOnlyList<ProjectFile>> ScanAsync(string projectRoot, CancellationToken cancellationToken)
     {
@@ -37,19 +49,33 @@ public sealed class LocalProjectFileScanner : IProjectFileScanner
                 continue;
             }
 
-            var content = await File.ReadAllTextAsync(path, Encoding.UTF8, cancellationToken);
             var relativePath = Path.GetRelativePath(root, path).Replace('\\', '/');
+            var indexableFile = await ReadIndexableContentAsync(path, relativePath, cancellationToken);
             var lastWriteTime = File.GetLastWriteTimeUtc(path);
 
             files.Add(new ProjectFile(
                 relativePath,
                 Path.GetFullPath(path),
-                content,
-                ComputeSha256(content),
+                indexableFile.Content,
+                indexableFile.ContentHash,
                 new DateTimeOffset(lastWriteTime, TimeSpan.Zero)));
         }
 
         return files.OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private async Task<IndexableFileContent> ReadIndexableContentAsync(string path, string relativePath, CancellationToken cancellationToken)
+    {
+        if (SupportedSourceFile.IsUnrealAssetMetadataSupported(path))
+        {
+            var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+            return new IndexableFileContent(
+                _assetMetadataExtractor.Extract(relativePath),
+                ComputeSha256(bytes));
+        }
+
+        var content = await File.ReadAllTextAsync(path, Encoding.UTF8, cancellationToken);
+        return new IndexableFileContent(content, ComputeSha256(content));
     }
 
     private static bool ShouldIgnore(string root, string path)
@@ -64,4 +90,12 @@ public sealed class LocalProjectFileScanner : IProjectFileScanner
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    private static string ComputeSha256(byte[] content)
+    {
+        var bytes = SHA256.HashData(content);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    private sealed record IndexableFileContent(string Content, string ContentHash);
 }

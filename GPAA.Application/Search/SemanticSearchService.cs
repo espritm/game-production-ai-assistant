@@ -39,6 +39,7 @@ public sealed class SemanticSearchService
         var queryEmbedding = await _embeddingProvider.EmbedAsync(request.Query, cancellationToken);
 
         var compatibleChunks = snapshot.Chunks
+            .Where(chunk => MatchesSourceFilter(chunk.RelativePath, request.SourceFilter))
             .Where(chunk => chunk.Embedding.Count == queryEmbedding.Count)
             .ToArray();
 
@@ -54,9 +55,31 @@ public sealed class SemanticSearchService
                 chunk.StartLine,
                 chunk.EndLine,
                 chunk.Content,
-                VectorMath.CosineSimilarity(queryEmbedding, chunk.Embedding)))
+                VectorMath.CosineSimilarity(queryEmbedding, chunk.Embedding),
+                GetSourceType(chunk.RelativePath)))
             .OrderByDescending(result => result.Score)
             .Take(topK)
             .ToArray();
     }
+
+    private static bool MatchesSourceFilter(string relativePath, string sourceFilter)
+    {
+        if (sourceFilter.Equals("Assets", StringComparison.OrdinalIgnoreCase))
+        {
+            return IsAssetMetadataPath(relativePath);
+        }
+
+        if (sourceFilter.Equals("Code", StringComparison.OrdinalIgnoreCase))
+        {
+            return !IsAssetMetadataPath(relativePath);
+        }
+
+        return true;
+    }
+
+    private static string GetSourceType(string relativePath)
+        => IsAssetMetadataPath(relativePath) ? "Asset" : "Code";
+
+    private static bool IsAssetMetadataPath(string relativePath)
+        => relativePath.StartsWith(".gpaa/unreal-assets/", StringComparison.OrdinalIgnoreCase);
 }

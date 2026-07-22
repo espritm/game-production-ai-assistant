@@ -54,9 +54,19 @@ Supported source files:
 - `.h`
 - `.hpp`
 - `.cpp`
+- `.cs`
 - `.ini`
 - `.uplugin`
 - `.uproject`
+
+Supported Unreal asset metadata files:
+
+- `.uasset`
+- `.umap`
+
+Binary Unreal assets are not parsed deeply in V1. `UnrealAssetMetadataExtractor` creates a synthetic indexable document from path metadata: asset name, extension, folder, relative path, and inferred asset type. Inferred types include Blueprint, Widget Blueprint, Map, Material, Material Instance, Texture, Static Mesh, Skeletal Mesh, Data Asset, Data Table, and Animation assets.
+
+When the Unreal plugin is used, it also syncs Asset Registry metadata before `Search` and `Ask`. The backend stores this data through `IUnrealAssetMetadataRepository` and indexes it as virtual `.gpaa/unreal-assets/*.asset-metadata` documents. These documents include object path, package name, package path, asset name, asset class, a bounded set of Asset Registry tags such as generated class or parent class when Unreal exposes them, and package dependency/referencer relationships for assets under `/Game`.
 
 Ignored directories:
 
@@ -94,6 +104,7 @@ Default storage path:
 ## Inference Providers
 
 Two provider modes exist.
+`Chat.Provider` selects the chat provider when configured. If it is empty, the backend keeps backward compatibility by using Ollama when `Ollama.UseOllamaChat` is true and echo mode otherwise.
 
 ### Default Offline Safe Mode
 
@@ -120,6 +131,32 @@ Set these values in `GPAA.Api/appsettings.json`:
 }
 ```
 
+### OpenAI-Compatible Cloud Chat
+
+Set `Chat.Provider` to `OpenAICompatible` to route `Ask` through a cloud or gateway API that implements the `/v1/chat/completions` shape. Embeddings can still use Ollama locally.
+
+```json
+{
+  "Chat": {
+    "Provider": "OpenAICompatible"
+  },
+  "OpenAICompatible": {
+    "BaseUrl": "https://api.openai.com/v1",
+    "Model": "gpt-4.1-mini",
+    "ApiKeyEnvironmentVariable": "OPENAI_API_KEY",
+    "TimeoutSeconds": 120,
+    "MaxOutputTokens": 512,
+    "Temperature": 0.2
+  }
+}
+```
+
+The first cloud implementation is intentionally narrow: it depends only on `IChatCompletionProvider`, keeps secrets out of source by default, and can be replaced by direct Anthropic, Azure OpenAI, or other adapters without changing application services.
+
+Runtime chat settings can be changed from the Unreal plugin through `/runtime/chat-settings`; no backend restart is required for those changes. `/runtime/chat-provider/test` sends a small provider health-check prompt and is the preferred way to validate authentication, model access, quota, and timeout before running a full project `Ask`.
+
+Cloud provider failures should be normalized at the infrastructure boundary. `OpenAICompatibleChatCompletionProvider` turns common provider errors such as invalid API keys, insufficient quota, and rate limits into user-readable `InvalidOperationException` messages. API endpoints convert those exceptions to Problem Details responses with gateway-style status codes.
+
 ## Build
 
 ```powershell
@@ -139,6 +176,7 @@ Current coverage includes:
 - source chunking with overlap;
 - vector similarity ranking;
 - Unreal generated directory filtering;
+- Unreal asset metadata scanning;
 - end-to-end indexing and semantic search;
 - incremental index reuse;
 - automatic search-time refresh after file changes;
@@ -173,6 +211,28 @@ It is intentionally thin:
 - no indexing or inference logic inside the editor process.
 
 The plugin talks to the backend through the public local API. This keeps Unreal code small and avoids duplicating backend behavior in C++.
+
+Editor-facing configuration is centralized in `UGPAAEditorSettings` and registered under:
+
+```txt
+Project Settings -> Plugins -> Game Production AI Assistant
+```
+
+The settings object uses Unreal editor per-project user settings, so local values persist across editor restarts without forcing secrets into shared project files. It also supports JSON profile import/export for users moving between workstations; API keys are omitted unless explicitly included.
+
+Backend lifecycle checks are handled by `FGPAABackendSupervisor`. UI workflows call it before making backend requests. The supervisor checks `/health`, starts the packaged backend when available, and retries health checks before the original workflow continues. This keeps search, ask, history, knowledge status, and refresh workflows usable after opening Unreal without manually starting the .NET API.
+
+Packaged installs should include the published backend at:
+
+```txt
+plugin/Resources/Backend/GPAA.Api.exe
+```
+
+Use `scripts/package-unreal-plugin.ps1` to publish the backend and create the Unreal plugin package. The script creates a self-contained Windows backend by default; use `-FrameworkDependent` only for developer packages where the target machine already has the .NET runtime. If no packaged backend is available, the supervisor falls back to developer mode and tries to resolve `GPAA.Api.csproj`.
+
+The supervisor keeps a process handle only for backend processes it launches. `FGPAABackendSupervisor::ShutdownLaunchedBackend()` is called from the plugin module shutdown path and the engine pre-exit delegate, then terminates that owned process when `Stop Backend On Editor Shutdown` is enabled. It intentionally does not terminate pre-existing backend processes.
+
+For robustness, the supervisor also appends `--GpaaParentProcessId <pid>` to launched backend commands. `ParentProcessMonitorService` uses this value to stop the backend if the Unreal editor process disappears before plugin shutdown completes.
 
 See [Unreal Editor Plugin](unreal-plugin.md).
 

@@ -48,6 +48,7 @@ Read the docs:
 - [User Guide](docs/user-guide.md)
 - [Local Backend API](docs/api.md)
 - [Unreal Editor Plugin](docs/unreal-plugin.md)
+- [Unreal Plugin Packaging CI/CD Roadmap](docs/plugin-packaging-ci-cd.md)
 
 ## Vision
 
@@ -271,6 +272,42 @@ Analyze this Unreal packaging failure.
 - multi-user knowledge base
 - automated review assistant
 - profiling analysis
+
+### Expanded Roadmap - Unreal Compatibility and MCP
+
+#### V1.x - Unreal Version Compatibility
+
+The tool must remain useful for long-lived productions that cannot freely upgrade Unreal Engine.
+
+- Define a supported Unreal compatibility matrix, starting from the oldest practical UE5 version and extending through the latest validated version.
+- Keep a stable core plugin layer that only depends on widely available Unreal Editor, HTTP, and Slate APIs.
+- Isolate version-specific Unreal code behind small adapter modules or preprocessor-guarded integration classes.
+- Package and validate the plugin per Unreal version instead of assuming that a single binary works everywhere.
+- Add automated compile validation for each supported Unreal version available in CI or in local release tooling.
+- Document known limitations by engine version, especially for source opening, Asset Registry metadata, Project Settings behavior, and experimental engine APIs.
+- Prefer graceful feature degradation: older Unreal versions should keep search, ask, indexing, and settings even when newer automation capabilities are unavailable.
+
+#### V2.x - Unreal MCP Integration
+
+Newer Unreal versions expose an experimental Unreal MCP plugin, identified in engine code as `ModelContextProtocol`. GPAA should use it when available, without making it mandatory for older projects.
+
+- Detect whether Unreal MCP is installed and enabled in the current editor session.
+- Add a backend-side MCP client abstraction that can connect to the editor-local MCP server.
+- Discover available MCP tools at runtime instead of hard-coding assumptions about experimental tool names.
+- Introduce a capability model so the assistant can distinguish read-only workflows from project-modifying workflows.
+- Route safe read operations through existing indexing/search paths, and route editor actions through MCP only when available.
+- Add an explicit user approval flow before any MCP action that modifies levels, actors, assets, materials, settings, or source-controlled files.
+- Record an action history with requested action, tool call, parameters, result, and rollback guidance when possible.
+- Start with low-risk editor actions such as inspecting selection, listing actors, running automation tests, and opening editor panels.
+- Progressively add controlled write actions such as creating folders, spawning actors in a test level, creating material instances, fixing metadata, and applying simple project settings.
+- Keep MCP support optional, experimental, and version-gated until Unreal MCP APIs stabilize.
+
+#### V3.x - Validated Project Automation
+
+- Add project modification proposals with diff previews, test execution, and approval checkpoints.
+- Combine semantic search, chat reasoning, Unreal MCP tools, and backend validators in plan-and-execute workflows.
+- Provide studio-specific tool packs for coding standards, content rules, build systems, and release workflows.
+- Preserve the compatibility strategy when expanding toward multi-engine support.
 
 ---
 

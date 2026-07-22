@@ -6,4 +6,5 @@ public sealed record SearchResult(
     int StartLine,
     int EndLine,
     string Content,
-    double Score);
+    double Score,
+    string SourceType = "Code");

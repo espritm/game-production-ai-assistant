@@ -11,6 +11,9 @@ public:
 
 private:
     void RegisterMenus();
+    void HandleEnginePreExit();
     void OpenAssistantTab();
     TSharedRef<class SDockTab> SpawnAssistantTab(const class FSpawnTabArgs& Args);
+
+    FDelegateHandle EnginePreExitHandle;
 };

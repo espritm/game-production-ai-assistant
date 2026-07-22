@@ -9,3 +9,5 @@ TestResults/
 plugin/Binaries/
 plugin/Intermediate/
 plugin/Saved/
+plugin/Resources/Backend/*
+!plugin/Resources/Backend/.gitkeep

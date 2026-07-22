@@ -82,6 +82,113 @@ projectRoot=C:\Path\To\Project
 
 The response uses the same statistics shape as `POST /projects/index`.
 
+## `POST /projects/assets/metadata`
+
+Synchronizes Unreal Asset Registry metadata collected by the Unreal Editor plugin. The backend stores this metadata locally and indexes it as virtual asset metadata documents during the next automatic index refresh.
+
+Request:
+
+```json
+{
+  "projectRoot": "C:\\Path\\To\\Project",
+  "assets": [
+    {
+      "objectPath": "/Game/UI/WBP_Inventory.WBP_Inventory",
+      "packageName": "/Game/UI/WBP_Inventory",
+      "packagePath": "/Game/UI",
+      "assetName": "WBP_Inventory",
+      "assetClass": "WidgetBlueprint",
+      "tags": {
+        "ParentClass": "UserWidget"
+      },
+      "dependencies": [
+        "/Game/UI/WBP_InventoryStyle"
+      ],
+      "referencers": [
+        "/Game/Maps/L_DebugInventory"
+      ]
+    }
+  ]
+}
+```
+
+## `GET /projects/knowledge/status`
+
+Returns the current local knowledge state for a project, including index statistics and Unreal Asset Registry metadata counts.
+
+Query:
+
+```txt
+projectRoot=C:\Path\To\Project
+```
+
+Response:
+
+```json
+{
+  "statistics": {
+    "filesScanned": 42,
+    "filesIndexed": 42,
+    "chunksIndexed": 120,
+    "indexedAt": "2026-06-25T20:42:00Z",
+    "filesReused": 42,
+    "filesChanged": 0,
+    "filesRemoved": 0,
+    "chunksReused": 120,
+    "chunksEmbedded": 0,
+    "fullRebuild": false,
+    "embeddingModel": "ollama:nomic-embed-text"
+  },
+  "embeddingModel": "ollama:nomic-embed-text",
+  "codeFilesIndexed": 28,
+  "assetsSynced": 14,
+  "assetDocumentsIndexed": 14,
+  "hasIndex": true
+}
+```
+
+## `GET /runtime/chat-settings`
+
+Returns the current local chat provider settings used by `Ask`.
+
+Sensitive API keys are masked in responses.
+
+## `POST /runtime/chat-settings`
+
+Updates the local chat provider settings. The backend applies these settings to subsequent `Ask` requests without a restart.
+
+Request:
+
+```json
+{
+  "provider": "OpenAICompatible",
+  "openAIBaseUrl": "https://api.openai.com/v1",
+  "openAIModel": "gpt-4.1-mini",
+  "openAIApiKey": "your-api-key",
+  "openAIApiKeyEnvironmentVariable": "OPENAI_API_KEY",
+  "timeoutSeconds": 120,
+  "maxOutputTokens": 512,
+  "temperature": 0.2
+}
+```
+
+## `POST /runtime/chat-provider/test`
+
+Sends a small health-check prompt to the currently saved chat provider. Use this endpoint to validate authentication, model access, timeout, and quota before asking a project question.
+
+Response:
+
+```json
+{
+  "provider": "OpenAICompatible",
+  "model": "gpt-4.1-mini",
+  "message": "GPAA chat provider ready.",
+  "testedAt": "2026-06-25T20:42:00Z"
+}
+```
+
+Provider failures are returned as Problem Details. Authentication, quota, and rate-limit failures are normalized into user-readable `detail` messages.
+
 ## `POST /search`
 
 Runs semantic search against an indexed project.
@@ -94,9 +201,12 @@ Request:
 {
   "projectRoot": "C:\\Path\\To\\Project",
   "query": "Where is stamina regeneration handled?",
-  "topK": 5
+  "topK": 5,
+  "sourceFilter": "All"
 }
 ```
+
+`sourceFilter` accepts `All`, `Code`, or `Assets`. It defaults to `All`.
 
 Response:
 
@@ -108,7 +218,8 @@ Response:
     "startLine": 1,
     "endLine": 80,
     "content": "...",
-    "score": 0.82
+    "score": 0.82,
+    "sourceType": "Code"
   }
 ]
 ```
@@ -125,9 +236,12 @@ Request:
 {
   "projectRoot": "C:\\Path\\To\\Project",
   "question": "Where is stamina regeneration handled?",
-  "topK": 5
+  "topK": 5,
+  "sourceFilter": "All"
 }
 ```
+
+`sourceFilter` accepts the same values as `POST /search`.
 
 ## `POST /chat/stream`
 

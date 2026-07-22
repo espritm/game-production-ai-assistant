@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using GPAA.Application.Ports;
 using GPAA.Application.Projects;
 using GPAA.Core.Indexing;
@@ -8,25 +10,33 @@ namespace GPAA.Application.Indexing;
 
 public sealed class ProjectIndexingService
 {
+    private const int MaxEmbeddingInputCharacters = 1800;
+
     private readonly IProjectFileScanner _scanner;
     private readonly IEmbeddingProvider _embeddingProvider;
     private readonly IKnowledgeRepository _repository;
+    private readonly IUnrealAssetMetadataRepository _assetMetadataRepository;
     private readonly SourceChunker _chunker;
     private readonly SourceContextExtractor _contextExtractor;
+    private readonly UnrealAssetRegistryDocumentRenderer _assetRegistryDocumentRenderer;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _projectLocks = new(StringComparer.OrdinalIgnoreCase);
 
     public ProjectIndexingService(
         IProjectFileScanner scanner,
         IEmbeddingProvider embeddingProvider,
         IKnowledgeRepository repository,
+        IUnrealAssetMetadataRepository assetMetadataRepository,
         SourceChunker chunker,
-        SourceContextExtractor contextExtractor)
+        SourceContextExtractor contextExtractor,
+        UnrealAssetRegistryDocumentRenderer assetRegistryDocumentRenderer)
     {
         _scanner = scanner;
         _embeddingProvider = embeddingProvider;
         _repository = repository;
+        _assetMetadataRepository = assetMetadataRepository;
         _chunker = chunker;
         _contextExtractor = contextExtractor;
+        _assetRegistryDocumentRenderer = assetRegistryDocumentRenderer;
     }
 
     public async Task<IndexStatistics> IndexAsync(IndexProjectRequest request, CancellationToken cancellationToken)
@@ -49,7 +59,7 @@ public sealed class ProjectIndexingService
 
     private async Task<IndexStatistics> RebuildIncrementallyAsync(ProjectId projectId, CancellationToken cancellationToken)
     {
-        var scannedFiles = await _scanner.ScanAsync(projectId.Value, cancellationToken);
+        var scannedFiles = await GetIndexableFilesAsync(projectId, cancellationToken);
         var existingIndex = await _repository.GetProjectIndexAsync(projectId, cancellationToken);
         var canReuseExistingIndex = existingIndex?.Metadata.EmbeddingModel == _embeddingProvider.ModelId;
         var existingFilesByPath = canReuseExistingIndex
@@ -98,6 +108,7 @@ public sealed class ProjectIndexingService
                 var content = sourceContext.Length == 0
                     ? draft.Content
                     : $"Project source context:{Environment.NewLine}{sourceContext}{Environment.NewLine}{Environment.NewLine}{draft.Content}";
+                content = LimitEmbeddingInput(content);
                 var embedding = await _embeddingProvider.EmbedAsync(content, cancellationToken);
                 chunks.Add(new SourceChunk(
                     CreateChunkId(file.ContentHash, draft.StartLine, draft.EndLine),
@@ -138,4 +149,57 @@ public sealed class ProjectIndexingService
 
     private static string CreateChunkId(string contentHash, int startLine, int endLine)
         => $"{contentHash}:{startLine}:{endLine}";
+
+    private static string LimitEmbeddingInput(string content)
+    {
+        if (content.Length <= MaxEmbeddingInputCharacters)
+        {
+            return content;
+        }
+
+        return string.Concat(
+            content.AsSpan(0, MaxEmbeddingInputCharacters),
+            Environment.NewLine,
+            "[Content truncated before embedding because it exceeds the local embedding model context window.]");
+    }
+
+    private async Task<IReadOnlyList<ProjectFile>> GetIndexableFilesAsync(ProjectId projectId, CancellationToken cancellationToken)
+    {
+        var files = (await _scanner.ScanAsync(projectId.Value, cancellationToken)).ToList();
+        var assets = await _assetMetadataRepository.ListAsync(projectId, cancellationToken);
+
+        foreach (var asset in assets)
+        {
+            var content = _assetRegistryDocumentRenderer.Render(
+                asset.ObjectPath,
+                asset.PackageName,
+                asset.PackagePath,
+                asset.AssetName,
+                asset.AssetClass,
+                asset.Tags,
+                asset.Dependencies,
+                asset.Referencers);
+
+            var relativePath = $".gpaa/unreal-assets/{SanitizeVirtualPath(asset.ObjectPath)}.asset-metadata";
+            files.Add(new ProjectFile(
+                relativePath,
+                relativePath,
+                content,
+                ComputeSha256(content),
+                DateTimeOffset.UtcNow));
+        }
+
+        return files.OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    private static string SanitizeVirtualPath(string value)
+        => string.Join('_', value.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries))
+            .Replace('/', '_')
+            .Replace('\\', '_');
+
+    private static string ComputeSha256(string content)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
 }
