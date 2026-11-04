@@ -16,7 +16,7 @@ The repository currently provides `scripts/package-unreal-plugin.ps1`. It:
 4. runs Unreal Automation Tool `BuildPlugin` for Win64;
 5. writes the unpacked plugin package to `.gpaa/PluginPackage`.
 
-The workflow has been validated locally with Unreal Engine 5.6 on Windows. It is not yet a release pipeline: it does not create a versioned zip, validate package contents, run an installation smoke test, or publish a GitHub Release.
+The workflow creates a sanitized, verified, versioned zip with a stable file order and timestamps. The separate installation smoke test exercises the exact archive in Unreal Engine 5.6 on Windows. GitHub Release publication is not implemented yet.
 
 ## Target Pipeline
 
@@ -47,6 +47,8 @@ dotnet run --project GPAA.Tests\GPAA.Tests.csproj --configuration Release
 ```
 
 Add a separate Unreal build job on a Windows self-hosted runner with Unreal Engine 5.6 installed. This job must invoke `BuildPlugin` and retain its logs when it fails.
+
+The implemented `ci-unreal.yml` job expects the runner labels `windows`, `x64`, `unreal`, and `ue-5.6`. It reads the Unreal installation from the runner-level `UE_5_6_ROOT` environment variable and falls back to `C:\Program Files\Epic Games\UE_5.6`. For security, pull requests originating from forks do not execute code on the persistent self-hosted runner.
 
 Formatting and lint checks can be introduced later, once their rules and developer workflow are agreed.
 
@@ -110,16 +112,38 @@ Implement `scripts/verify-plugin-package.ps1` as a release gate. It should inspe
 
 Prefer an allowlist for top-level package paths, with narrowly defined exceptions, over an ever-growing denylist.
 
+The verifier is implemented for both package directories and zip archives. Run it with:
+
+```powershell
+.\scripts\verify-plugin-package.ps1 `
+  -PackagePath ".gpaa\PluginPackage" `
+  -ExpectedVersion "v0.1.0"
+```
+
+It deliberately rejects the raw `BuildPlugin` output while that output still contains `Intermediate`, debug symbols, development configuration, or placeholders. The release packaging job must sanitize the output before invoking this gate.
+
 ## Automated Smoke Tests
 
-The release workflow must install the candidate package into a minimal C++ Unreal project and launch `UnrealEditor-Cmd.exe` unattended. The test must verify that:
+`scripts/test-unreal-plugin-package.ps1` installs the candidate package into a fresh minimal content-only Unreal project and launches `UnrealEditor-Cmd.exe` unattended. This deliberately loads the precompiled C++ plugin without compiling a host project or rebuilding the package. The test verifies that:
 
 - Unreal discovers and loads the plugin;
 - the `GPAA.Plugin` automation tests pass;
 - the packaged backend starts without a repository checkout or installed .NET runtime;
 - the backend health endpoint becomes ready;
 - the backend process stops after Unreal exits;
-- Unreal and backend logs contain no release-blocking error.
+- Unreal automation and the editor log contain no release-blocking error.
+
+```powershell
+.\scripts\test-unreal-plugin-package.ps1 `
+  -PackagePath ".gpaa\releases\GameProductionAIAssistant-v0.1.0-UE5.6-Win64.zip" `
+  -UnrealEngineRoot "C:\Program Files\Epic Games\UE_5.6"
+```
+
+The test selects an available loopback port, observes the backend executable under the installed plugin with the expected editor parent ID, checks `/health`, and requires its exit within 15 seconds of the editor exit. It runs all `GPAA.Plugin` tests, including the opt-in packaged backend integration test. It does not require Ollama or make model requests. Unreal uses an in-memory derived-data cache to avoid a dependency on Zen or shared cache configuration. A five-minute timeout bounds the run; logs, JSON reports, and a success summary including the archive SHA256 remain under `.gpaa/smoke/<run-id>` on success or failure (the success summary is written only on success).
+
+The Unreal CI job builds and verifies the complete archive, runs this smoke test against that archive, and uploads the archive only after success. Smoke evidence is retained on failure too. A compatible self-hosted runner must be configured before this job can execute on GitHub.
+
+The fixture disables unrelated engine plugins by default. UE 5.6 can emit generic `LogAutomationTest: Error: Condition failed` messages while discovering its low-level tests, before the selected GPAA suite starts. The log gate excludes only that exact pre-suite diagnostic; all selected test failures, errors after the suite starts, fatal errors, and assertions still fail validation. Logs are preserved in full.
 
 Run the smoke test against the exact files that will be zipped. Rebuilding or copying a second package after the smoke test would invalidate the result.
 
@@ -153,9 +177,9 @@ Self-hosted jobs must clean their dedicated working/output directories between r
 ## Implementation Order
 
 - [x] Add `ci-dotnet.yml` on GitHub-hosted Windows.
-- [ ] Add UE 5.6 `BuildPlugin` validation on a self-hosted runner.
-- [ ] Add `verify-plugin-package.ps1` and automated tests for its rules.
-- [ ] Add minimal Unreal test project installation and smoke-test automation.
+- [x] Add UE 5.6 `BuildPlugin` validation on a self-hosted runner.
+- [x] Add `verify-plugin-package.ps1` and automated tests for its rules.
+- [x] Add minimal Unreal test project installation and smoke-test automation.
 - [ ] Add tag-triggered packaging and GitHub Release publication.
 - [ ] Produce and manually review the first Fab candidate.
 - [ ] Add the Unreal version matrix and declare the minimum supported version.

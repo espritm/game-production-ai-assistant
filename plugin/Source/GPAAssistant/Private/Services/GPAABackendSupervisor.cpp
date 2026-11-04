@@ -72,7 +72,7 @@ void FGPAABackendSupervisor::EnsureBackendReady(
     CheckHealth(BackendUrl, FGPAARequestCompleted::CreateLambda(
         [this, BackendUrl, OnStatusChanged, OnCompleted](bool bSucceeded, const FString& Message)
         {
-            RetryHealthCheck(BackendUrl, 0, OnStatusChanged, OnCompleted, bSucceeded, Message);
+            RetryHealthCheck(BackendUrl, -1, OnStatusChanged, OnCompleted, bSucceeded, Message);
         }));
 }
 
@@ -110,7 +110,13 @@ void FGPAABackendSupervisor::RetryHealthCheck(
         return;
     }
 
-    if (RemainingAttempts <= 0)
+    if (RemainingAttempts == 0)
+    {
+        OnCompleted.ExecuteIfBound(false, TEXT("The local backend did not become ready before the startup timeout."));
+        return;
+    }
+
+    if (RemainingAttempts < 0)
     {
         const UGPAAEditorSettings* Settings = GetDefault<UGPAAEditorSettings>();
         if (!Settings || !Settings->bAutoStartBackend)

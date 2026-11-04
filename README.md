@@ -24,6 +24,8 @@ The repository now contains the first local backend foundation for V1:
 
 ## Quick Start
 
+Use the .NET 10 SDK to build the `.slnx` solution. The application targets .NET 8; install the .NET 8 runtime for development runs. Distribution packages include their own runtime.
+
 Build the solution:
 
 ```powershell
@@ -369,4 +371,4 @@ MIT
 
 ## Status
 
-Early architecture phase.
+V1 beta implementation. Unreal Engine 5.6 / Win64 packaging and installation smoke-test tooling are available. Automated release publication and broader Unreal version validation remain planned.

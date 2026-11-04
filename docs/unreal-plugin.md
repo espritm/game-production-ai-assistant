@@ -212,11 +212,22 @@ This publishes the .NET backend into:
 plugin/Resources/Backend
 ```
 
-Then it runs Unreal `BuildPlugin`, producing:
+Then it runs Unreal `BuildPlugin`, removes development-only output, verifies the package policy, and produces:
 
 ```txt
 .gpaa/PluginPackage
+.gpaa/releases/GameProductionAIAssistant-v0.1.0-UE5.6-Win64.zip
 ```
+
+The version is read from `GameProductionAIAssistant.uplugin`. Pass `-ExpectedVersion "v0.1.0"` in release automation to enforce tag/descriptor consistency. The final directory and zip are both checked by `verify-plugin-package.ps1`; packaging stops before publication if either check fails.
+
+Validate the exact archive in a fresh Unreal project before distributing it:
+
+```powershell
+.\scripts\test-unreal-plugin-package.ps1 -PackagePath ".gpaa\releases\GameProductionAIAssistant-v0.1.0-UE5.6-Win64.zip"
+```
+
+This runs Unreal automation tests, observes the embedded backend becoming healthy, and checks that it stops after the editor exits. Evidence is preserved under `.gpaa/smoke`. The test does not require Ollama. The `GPAA.Plugin.Integration.PackagedBackend` test is opt-in through `-GPAASmokeBackendUrl` and is exercised automatically by the script.
 
 For a C++-only validation build, the plugin can also be validated with:
 

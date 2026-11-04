@@ -24,10 +24,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up .NET 8 SDK
+      - name: Set up build SDK and .NET 8 runtime
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          # .slnx requires a recent SDK; the application still targets .NET 8.
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore dependencies
         run: dotnet restore GameProductionAIAssistant.slnx
@@ -37,3 +40,7 @@ jobs:
 
       - name: Run tests
         run: dotnet run --project GPAA.Tests/GPAA.Tests.csproj --configuration Release --no-build
+
+      - name: Test plugin package verifier
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/verify-plugin-package.Tests.ps1
