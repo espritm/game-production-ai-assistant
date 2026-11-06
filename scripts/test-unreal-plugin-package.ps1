@@ -88,7 +88,9 @@ try {
     $resultPath = Join-Path $report 'index.json'
     if (-not (Test-Path -LiteralPath $resultPath)) { throw 'Unreal automation report is missing.' }
     $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
-    if ($result.failed -gt 0 -or $result.succeeded -lt 5 -or $result.notRun -gt 0) {
+    $succeededTests = $result.succeeded + $result.succeededWithWarnings
+    if ($result.failed -gt 0 -or $succeededTests -lt 5 -or $result.notRun -gt 0 -or
+        @($result.tests | Where-Object { $_.state -ne 'Success' -or $_.errors -gt 0 }).Count -gt 0) {
         throw "Unreal automation failed or did not run all expected tests. See $resultPath"
     }
     $integration = @($result.tests | Where-Object { $_.fullTestPath -eq 'GPAA.Plugin.Integration.PackagedBackend' })
@@ -103,7 +105,8 @@ try {
         if (-not $suiteStarted -and $line -match 'LogAutomationTest: Error: Condition failed\s*$') { continue }
         if ($line -match '(Fatal error:|Assertion failed:|Log\w+: Error:)') { throw "Release-blocking error in $log : $line" }
     }
-    @{ succeeded = $true; backendHealthy = $healthy; backendStopped = $true; tests = $result.succeeded;
+    @{ succeeded = $true; backendHealthy = $healthy; backendStopped = $true; tests = $succeededTests;
+        testsWithWarnings = $result.succeededWithWarnings;
         package = (Resolve-Path -LiteralPath $PackagePath).Path; archiveSHA256 = $packageHash } |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runRoot 'smoke-result.json') -Encoding UTF8
     Write-Host "PASS installed package, Unreal automation, backend health and shutdown. Evidence: $runRoot"

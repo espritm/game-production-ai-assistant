@@ -145,6 +145,8 @@ The Unreal CI job builds and verifies the complete archive, runs this smoke test
 
 The fixture disables unrelated engine plugins by default. UE 5.6 can emit generic `LogAutomationTest: Error: Condition failed` messages while discovering its low-level tests, before the selected GPAA suite starts. The log gate excludes only that exact pre-suite diagnostic; all selected test failures, errors after the suite starts, fatal errors, and assertions still fail validation. Logs are preserved in full.
 
+Unreal reports successful tests with warnings separately from successful tests without warnings. The gate counts both, while requiring every test state to be `Success` with zero errors. An initial health request may time out before the backend starts; this warning remains visible in the report and `testsWithWarnings` summary field.
+
 Run the smoke test against the exact files that will be zipped. Rebuilding or copying a second package after the smoke test would invalidate the result.
 
 ## Release Gates
