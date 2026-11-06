@@ -26,9 +26,6 @@ jobs:
       - unreal
       - ue-5.6
     timeout-minutes: 90
-    env:
-      DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
-      DOTNET_CLI_HOME: ${{ runner.temp }}/dotnet-home
     defaults:
       run:
         shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
@@ -36,6 +33,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Configure writable .NET directories
+        run: |
+          $ErrorActionPreference = 'Stop'
+          "DOTNET_INSTALL_DIR=$env:RUNNER_TEMP\dotnet" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "DOTNET_CLI_HOME=$env:RUNNER_TEMP\dotnet-home" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v4
