@@ -40,6 +40,16 @@ jobs:
           "DOTNET_INSTALL_DIR=$env:RUNNER_TEMP\dotnet" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "DOTNET_CLI_HOME=$env:RUNNER_TEMP\dotnet-home" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Map a short Unreal build path
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $drive = @('Z:', 'Y:', 'X:', 'W:', 'V:', 'U:', 'T:') | Where-Object { -not (Test-Path "$_\") } | Select-Object -First 1
+          if (-not $drive) { throw 'No free drive letter is available for the Unreal build.' }
+          subst.exe $drive $env:GITHUB_WORKSPACE
+          if ($LASTEXITCODE -ne 0) { throw 'Could not map the short Unreal build path.' }
+          "GPAA_BUILD_DRIVE=$drive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "GPAA_BUILD_ROOT=$drive\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v4
         with:
@@ -61,11 +71,13 @@ jobs:
           "GPAA_ENGINE_ROOT=$engineRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build and verify complete distribution package
+        working-directory: ${{ env.GPAA_BUILD_ROOT }}
         run: |
           $ErrorActionPreference = 'Stop'
           & .\scripts\package-unreal-plugin.ps1 -UnrealEngineRoot $env:GPAA_ENGINE_ROOT
 
       - name: Install exact release archive and run Unreal smoke test
+        working-directory: ${{ env.GPAA_BUILD_ROOT }}
         run: |
           $ErrorActionPreference = 'Stop'
           $version = (Get-Content plugin/GameProductionAIAssistant.uplugin -Raw | ConvertFrom-Json).VersionName
@@ -109,3 +121,10 @@ jobs:
           path: ${{ github.workspace }}/.gpaa/ci/uat-logs
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Remove short build path mapping
+        if: always() && env.GPAA_BUILD_DRIVE != ''
+        run: |
+          $ErrorActionPreference = 'Stop'
+          subst.exe $env:GPAA_BUILD_DRIVE /D
+          if ($LASTEXITCODE -ne 0) { throw 'Could not remove the short build path mapping.' }

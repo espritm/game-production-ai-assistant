@@ -172,6 +172,8 @@ Unreal Engine is not a practical dependency to install from scratch on a standar
 
 The self-hosted runner should use explicit labels such as `self-hosted`, `windows`, `unreal`, and `ue-5.6`. Its Unreal installation path, test project path, output directory, and signing or publishing credentials must be supplied through controlled runner configuration and GitHub environments, not committed machine-specific values.
 
+The Unreal job installs its SDK under the runner's temporary directory so the runner service does not need write access to `Program Files`. PowerShell execution policy is set only for the job's shell processes. A free drive letter from `Z:` through `T:` is temporarily mapped to the checkout with `subst` to keep UnrealBuildTool action paths below the Windows path limit; the mapping is removed after the job. The smoke test identifies its backend by its unique installation directory and editor parent ID, including when Windows reports a physical path instead of the mapped drive.
+
 Self-hosted jobs must clean their dedicated working/output directories between runs and avoid executing untrusted fork code with release credentials.
 
 ## Implementation Order

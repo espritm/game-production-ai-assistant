@@ -53,6 +53,7 @@ $log = Join-Path $runRoot 'Unreal.log'
 $backend = $null
 $editorProcess = $null
 $healthy = $false
+$backendPathSuffix = '\' + (Split-Path -Leaf $runRoot) + '\GPAASmoke\Plugins\GameProductionAIAssistant\Resources\Backend\GPAA.Api.exe'
 $packageHash = if (Test-Path -LiteralPath $PackagePath -PathType Leaf) { (Get-FileHash -LiteralPath $PackagePath).Hash } else { $null }
 Write-Host "Smoke test evidence: $runRoot"
 try {
@@ -68,7 +69,9 @@ try {
         if ([DateTime]::UtcNow -gt $deadline) { throw 'Unreal smoke test timed out.' }
         if ($null -eq $backend) {
             $candidate = Get-CimInstance Win32_Process -Filter "Name = 'GPAA.Api.exe'" |
-                Where-Object { $_.ExecutablePath -ieq (Join-Path $pluginRoot 'Resources\Backend\GPAA.Api.exe') -and
+                # WMI may report the physical drive rather than a SUBST alias.
+                # Match the exact executable under this unique run directory.
+                Where-Object { $_.ExecutablePath -and $_.ExecutablePath.EndsWith($backendPathSuffix, [StringComparison]::OrdinalIgnoreCase) -and
                     $_.CommandLine -match "--GpaaParentProcessId $($editorProcess.Id)(\s|$)" } | Select-Object -First 1
             if ($null -ne $candidate) { $backend = Get-Process -Id $candidate.ProcessId -ErrorAction Stop; $null = $backend.Handle }
         }
@@ -105,7 +108,7 @@ try {
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $runRoot 'smoke-result.json') -Encoding UTF8
     Write-Host "PASS installed package, Unreal automation, backend health and shutdown. Evidence: $runRoot"
 } finally {
-    # Only terminate process handles discovered from this run's exact executable
+    # Only terminate process handles discovered from this run's unique executable
     # and parent ID; never touch an existing user editor or backend.
     if ($null -ne $editorProcess -and -not $editorProcess.HasExited) { $editorProcess.Kill(); $editorProcess.WaitForExit() }
     if ($null -ne $backend -and -not $backend.HasExited) { $backend.Kill(); $backend.WaitForExit() }
