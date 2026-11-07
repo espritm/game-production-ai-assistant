@@ -10,7 +10,7 @@ $stage=Join-Path $root ('.gpaa\native-build\'+[guid]::NewGuid().ToString('N')+'\
 $output=Join-Path $root '.gpaa\NativePackage'
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 foreach ($directory in @('Source','Config')) { Copy-Item -LiteralPath (Join-Path $root "plugin\$directory") -Destination $stage -Recurse }
-New-Item -ItemType Directory -Force -Path (Join-Path $stage 'Resources'),(Join-Path $stage 'Docs') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $stage 'Resources'),(Join-Path $stage 'Content'),(Join-Path $stage 'Docs') | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
 foreach ($doc in @('native-user-guide.md','native-third-party-notices.md')) { Copy-Item -LiteralPath (Join-Path $root "docs\$doc") -Destination (Join-Path $stage 'Docs') }
 $descriptor=Get-Content (Join-Path $root 'plugin\GameProductionAIAssistant.uplugin') -Raw | ConvertFrom-Json
@@ -36,6 +36,7 @@ foreach ($directory in @('Intermediate','Saved')) {
 Get-ChildItem -LiteralPath $output -Recurse -File -Force | Where-Object { $_.Extension -in @('.pdb','.log') -or $_.Name -eq '.gitkeep' } | Remove-Item -Force
 Copy-Item -LiteralPath (Join-Path $stage 'Docs') -Destination $output -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $output -Force
+New-Item -ItemType Directory -Force -Path (Join-Path $output 'Config'),(Join-Path $output 'Resources'),(Join-Path $output 'Content') | Out-Null
 & (Join-Path $PSScriptRoot 'verify-native-package.ps1') -PackagePath $stage -FabSource
 & (Join-Path $PSScriptRoot 'verify-native-package.ps1') -PackagePath $output
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -47,6 +48,13 @@ foreach ($variant in @(@{Path=$output;Suffix='Win64'},@{Path=$stage;Suffix='FabS
     $archive=[IO.Compression.ZipFile]::Open($zip,[IO.Compression.ZipArchiveMode]::Create)
     try {
         $source=(Resolve-Path -LiteralPath $variant.Path).Path.TrimEnd('\')
+        # Preserve empty standard directories too; enumerating files alone loses them.
+        foreach ($directory in (Get-ChildItem -LiteralPath $source -Recurse -Directory | Sort-Object FullName)) {
+            $name=($directory.FullName.Substring($source.Length+1) -replace '\\','/')+'/'
+            if ($variant.Suffix -eq 'FabSource') { $name='GameProductionAIAssistant/'+$name }
+            $entry=$archive.CreateEntry($name)
+            $entry.LastWriteTime=[DateTimeOffset]::new(2000,1,1,0,0,0,[TimeSpan]::Zero)
+        }
         foreach ($file in (Get-ChildItem -LiteralPath $source -Recurse -File -Force | Sort-Object FullName)) {
             $name=$file.FullName.Substring($source.Length+1) -replace '\\','/'
             if ($variant.Suffix -eq 'FabSource') { $name='GameProductionAIAssistant/'+$name }

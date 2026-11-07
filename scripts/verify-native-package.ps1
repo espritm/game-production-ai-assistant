@@ -4,6 +4,9 @@ $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $resolved=(Resolve-Path -LiteralPath $PackagePath).Path.TrimEnd('\','/')
 $files=@(Get-ChildItem -LiteralPath $resolved -Recurse -File -Force)
+foreach ($directory in @('Config','Content','Resources','Source')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $resolved $directory) -PathType Container)) { throw "Missing native package directory: $directory" }
+}
 foreach ($file in $files) {
     $relative=$file.FullName.Substring($resolved.Length+1) -replace '\\','/'
     if ($relative -match '(^|/)(Intermediate|Saved|\.gpaa|\.git|obj)(/|$)' -or $relative -match '\.(exe|msi|pdb|log|user|suo)$' -or $relative -match 'Resources/Backend' -or $file.Name -eq '.gitkeep') { throw "Forbidden native package file: $relative" }

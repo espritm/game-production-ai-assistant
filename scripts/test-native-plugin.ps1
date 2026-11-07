@@ -5,11 +5,13 @@ param(
     [int] $TimeoutSeconds = 300,
     [string] $TestFilter = 'GPAA.Native',
     [switch] $EngineInstallation,
-    [string] $AcceptanceProject
+    [string] $AcceptanceProject,
+    [string] $WorkspaceRoot
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
+if ($WorkspaceRoot) { $root=(Resolve-Path -LiteralPath $WorkspaceRoot).Path }
 if ([string]::IsNullOrWhiteSpace($PackagePath)) {$PackagePath=Join-Path $root '.gpaa\NativePackage'}
 $run = Join-Path $root ('.gpaa\native-smoke\' + [guid]::NewGuid().ToString('N'))
 $projectRoot = Join-Path $run 'Host'
