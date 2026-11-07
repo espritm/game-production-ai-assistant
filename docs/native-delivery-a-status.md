@@ -49,15 +49,34 @@ The UE 5.8 Windows ZIP was installed into `C:\Program Files\Epic Games\UE_5.8\En
 
 Repeat on an engine without an existing GPAA installation with `scripts/test-native-plugin.ps1 -UnrealEngineRoot <engine> -PackagePath <zip> -TestFilter GPAA -EngineInstallation`. The default remains a project-plugin installation. This does not establish clean-machine acceptance.
 
-The available `C:\Workspace\Unreal-test-proj\test_proj` has 434 assets and no project C++ source directory. It cannot establish retrieval relevance on a representative game codebase. A project path has been requested from the owner.
+The available `C:\Workspace\Unreal-test-proj\test_proj` has 434 assets and no project C++ source directory. It cannot establish retrieval relevance on a representative game codebase. The owner selected this project for the asset evaluation below.
 
 A [store listing draft](fab-listing-draft.md) now records product copy, limitations, publisher inputs and the demonstration capture plan. No listing has been submitted.
+
+## Real project asset evaluation
+
+The owner authorized `C:\Workspace\Unreal-test-proj\test_proj`. Content was copied into an isolated host; the original project was not migrated or modified. The host uses the original descriptor's enabled engine plugins. An initial minimal-plugin host could not register several animation assets (unknown custom versions); that attempt is invalid for relevance measurement and was superseded.
+
+With the normal engine plugins enabled, UE 5.8.4 registered 436 asset records (the project has 434 `.uasset` files; registry records also include map objects). Native metadata indexing completed in 11.35 seconds. The exact archive passed 15 tests with zero warnings and unchanged installed plugin files. Evidence: `.gpaa/native-smoke/6d44a8acea324893a9bc6a2c7a23d5ea/`, including `Host/Saved/GPAA/Acceptance/asset-search.json`.
+
+| Query | Expected asset | Rank within top 10 |
+|---|---|---|
+| pistol reload animation | MM_Pistol_Reload | 1 |
+| rifle equip animation | MM_Rifle_Equip | 2 |
+| death animation falling backwards | MM_Death_Back_01 | 2 |
+| animation de rechargement du pistolet | MM_Pistol_Reload | 4 |
+| animation pour equiper le fusil | MM_Rifle_Equip | Absent |
+| animation de mort vers l'arriere | MM_Death_Back_01 | Absent |
+
+On this small, manually selected set, English Recall@3 is 3/3 and French Recall@10 is 1/3. These are functional observations on asset metadata, not general benchmark claims or validation of C++ retrieval. The acceptance test reports ranks independently of technical test success; an absent expected registry record invalidates the experiment. No cloud request was made. The final acceptance archive SHA256 is `732F2A29CC206E085958B359253DC3555F035EC38F85DF6DA4B2861E9A7D8A59`. The simulated HTTP tests now request an OS-assigned ephemeral port rather than choosing a random port, fixing an intermittent Windows bind failure.
+
+Reproduce with `scripts/test-native-plugin.ps1 -UnrealEngineRoot <engine> -PackagePath <zip> -TestFilter GPAA -AcceptanceProject <project-directory>`. This optional acceptance case is not registered in normal CI runs without real assets. The script copies Content and uses enabled engine plugins; it does not copy custom project plugins or convert project code.
 
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.
 2. Test the exact precompiled archive on a clean user environment without .NET/Ollama. Project-plugin and engine-plugin installation tests now pass on the developer machine; that machine still has development tooling installed.
-3. Review search relevance on representative real Unreal projects. The initial embedding model is English; equivalent French-query quality is not yet claimed.
+3. Extend the small real-asset evaluation below to representative game C++ source and more queries. The initial embedding model is English; equivalent French-query quality is not claimed.
 4. Complete the Fab publisher profile, product ID/`FabURL`, third-party software declaration, listing media and user-facing compatibility claims. Validate current Fab requirements before submitting. The source ZIP has a plugin parent folder and excludes Unreal build binaries; it is a review candidate, not an approved store artifact.
 
 ## Build and test

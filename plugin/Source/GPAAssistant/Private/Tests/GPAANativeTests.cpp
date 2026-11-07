@@ -16,6 +16,9 @@
 #include "HttpServerModule.h"
 #include "IHttpRouter.h"
 #include "HttpServerResponse.h"
+#include "SocketSubsystem.h"
+#include "Sockets.h"
+#include "IPAddress.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 
@@ -68,7 +71,26 @@ bool FGPAANativeCloudHttpTest::RunTest(const FString &Parameters)
 {
     const bool Responses = Parameters != TEXT("compatible");
     auto State = MakeShared<FGPAACloudHttpState>();
-    int32 Port = 42000 + FMath::RandHelper(10000);
+    // Ask Windows for an available ephemeral port; random ports can fall into
+    // excluded ranges or collide with another local editor/test process.
+    auto* Sockets = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
+    FSocket* Probe = Sockets->CreateSocket(NAME_Stream, TEXT("GPAA test port"), false);
+    auto Address = Sockets->CreateInternetAddr();
+    bool ValidAddress = false;
+    Address->SetIp(TEXT("127.0.0.1"), ValidAddress);
+    Address->SetPort(0);
+    const bool Bound = Probe && ValidAddress && Probe->Bind(*Address);
+    const int32 Port = Bound ? Probe->GetPortNo() : 0;
+    if (Probe)
+    {
+        Probe->Close();
+        Sockets->DestroySocket(Probe);
+    }
+    if (!Port)
+    {
+        AddError(TEXT("Could not allocate an ephemeral loopback test port"));
+        return false;
+    }
     State->Router = FHttpServerModule::Get().GetHttpRouter(Port, true);
     if (!State->Router)
     {

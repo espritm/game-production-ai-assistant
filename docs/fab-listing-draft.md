@@ -32,7 +32,7 @@ Features:
 - Windows x64, Unreal Editor only. The plugin does not provide a packaged-game runtime assistant.
 - Locally compiled and tested with UE 5.6.1 and UE 5.8.4. Choose the archive matching your engine version. Only advertise the versions actually included in the submitted product.
 - Cloud chat requires internet access and a separate provider account. API-compatible providers can differ in supported fields and streaming behavior.
-- The bundled embedding model is English-oriented. French search quality has not yet been validated on representative projects.
+- The bundled embedding model is English-oriented. A small real-asset evaluation found weaker French results; equivalent French quality is not claimed.
 - Asset search uses metadata; it does not inspect every Blueprint graph or infer behavior from binary assets.
 - Fully local answer generation is outside this edition's implemented scope.
 - Current indexing bounds: 10,000 scanned files, 512 KiB per source file and 100,000 passages. Exact vector ranking is intended to be evaluated on representative project sizes before publishing scale claims.

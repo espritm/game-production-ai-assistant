@@ -4,7 +4,8 @@ param(
     [string] $UnrealEngineRoot = 'C:\Program Files\Epic Games\UE_5.6',
     [int] $TimeoutSeconds = 300,
     [string] $TestFilter = 'GPAA.Native',
-    [switch] $EngineInstallation
+    [switch] $EngineInstallation,
+    [string] $AcceptanceProject
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -36,11 +37,22 @@ Root=(Type=Memory, MaxCacheSize=256)
 bCloudContextAccepted=False
 '@ | Set-Content (Join-Path $projectRoot 'Config\DefaultEditorPerProjectUserSettings.ini') -Encoding UTF8
 '// Test fixture: stamina regenerates over time after a cooldown.' | Set-Content (Join-Path $projectRoot 'Source\StaminaComponent.cpp') -Encoding UTF8
+if ($AcceptanceProject) {
+    $content = Join-Path $AcceptanceProject 'Content'
+    if (-not (Test-Path -LiteralPath $content -PathType Container)) { throw 'Acceptance project Content directory missing.' }
+    Copy-Item -Path (Join-Path $content '*') -Destination (Join-Path $projectRoot 'Content') -Recurse -Force
+    $originalProjects = @(Get-ChildItem -LiteralPath $AcceptanceProject -Filter *.uproject -File)
+    if ($originalProjects.Count -ne 1) { throw 'Acceptance requires one project descriptor.' }
+    $original = Get-Content -LiteralPath $originalProjects[0].FullName -Raw | ConvertFrom-Json
+    $plugins = @($original.Plugins | Where-Object { $_.Name -ne 'GameProductionAIAssistant' }) + @(@{Name='GameProductionAIAssistant';Enabled=$true})
+    @{FileVersion=3;Plugins=$plugins} | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $projectRoot 'Host.uproject') -Encoding UTF8
+}
 $editor = Join-Path $UnrealEngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $report = Join-Path $run 'Report'
 $args = @('"' + (Join-Path $projectRoot 'Host.uproject') + '"', '-unattended','-nop4','-nosplash','-nullrhi','-nosound',
     '-DDC=GPAASmokeDDC','-NoZenAutoLaunch','-ExecCmds="Automation RunTests ' + $TestFilter + '"','-TestExit="Automation Test Queue Empty"',
     '-ReportExportPath="' + $report + '"','-abslog="' + (Join-Path $run 'Unreal.log') + '"')
+if ($AcceptanceProject) { $args += '-GPAARealAssets' }
 Write-Host "Native smoke evidence: $run"
 $proc = Start-Process $editor -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $run 'stdout.log') -RedirectStandardError (Join-Path $run 'stderr.log')
 $null = $proc.Handle
@@ -55,6 +67,7 @@ try {
     foreach ($test in @('GPAA.Native.Cloud.StreamingBoundaries','GPAA.Native.Cloud.HttpContract.Responses','GPAA.Native.Cloud.HttpContract.ChatCompletions','GPAA.Native.Embeddings.Corpus','GPAA.Native.Storage.AtomicRollbackAndHistory','GPAA.Native.Workflow.OfflineIndexAndSearch')) {
         if (@($result.tests | Where-Object { $_.fullTestPath -eq $test -and $_.state -eq 'Success' }).Count -ne 1) { throw "Required native test missing: $test" }
     }
+    if ($AcceptanceProject -and @($result.tests | Where-Object { $_.fullTestPath -like 'GPAA.Acceptance.ProjectAssets*' -and $_.state -eq 'Success' }).Count -ne 1) { throw 'Real project asset acceptance test missing.' }
     $suiteStarted=$false
     foreach ($line in (Get-Content -LiteralPath (Join-Path $run 'Unreal.log'))) {
         if ($line -match 'Test Started\..*Path=\{GPAA\.') {$suiteStarted=$true}
