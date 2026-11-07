@@ -11,12 +11,12 @@ The small embedding model is included in native archives. ONNX Runtime 1.20.1 an
 | Planned lot | Implementation status | Remaining validation |
 |---|---|---|
 | 0 — Prototype and distribution risks | CPU model integrated, tokenizer and pooling exercised, upstream licenses/notices included, latest UE target identified as 5.8 | Larger real-project and multilingual retrieval evaluation; publisher review of third-party declarations |
-| 1 — Modules and contracts | Three compiled modules, task cancellation and shutdown lifecycle | UE 5.8 compilation |
+| 1 — Modules and contracts | Three compiled modules, task cancellation and shutdown lifecycle | UE 5.8.4 compilation and 14-test suite passed locally |
 | 2 — Local indexing/storage | Incremental index, source context, bounded Asset Registry metadata, transactional SQLite and explicit legacy-history import | Production-sized projects and multi-editor stress |
 | 3 — Local search | Bundled embeddings, model identity versioning, exact vector ranking and Code/Assets result filtering | Broader retrieval quality beyond the controlled corpus |
 | 4 — Cloud and secrets | Responses and compatible Chat Completions, incremental SSE, cancellation, provider errors and OS credential store | An opt-in live request with the user's own provider account; CI uses simulated providers |
 | 5 — User workflows | Existing Slate panel connected to the native services; first-use instructions, key actions, consent, streaming, cancellation, references and history | Final manual UX acceptance |
-| 6 — Native distribution | Precompiled native ZIP, separate Fab source ZIP, dependency/policy checks and updated CI | UE 5.8 and runner availability, clean-machine test, dedicated engine-plugin installation check, actual Fab listing/declaration/review |
+| 6 — Native distribution | Precompiled native ZIP, separate Fab source ZIP, dependency/policy checks and updated CI | UE 5.8.4 passed locally; clean-machine test, dedicated engine-plugin installation check, actual Fab listing/declaration/review |
 
 These are implemented development deliverables, not an assertion that all external release gates have passed. No Fab submission or publication has been performed.
 
@@ -35,9 +35,17 @@ Validated locally with Unreal Engine 5.6.1 on Windows 11, Intel Core i5-14600K, 
 
 The test scripts do not make real paid cloud requests. The Windows developer machine has .NET installed, so a passing local test alone is not evidence of a clean-machine installation. The native build no longer publishes or embeds any .NET project; Unreal's own bundled build tooling remains part of the engine installation.
 
+## UE 5.8.4 validation
+
+Validated on 7 November 2026 using `C:\Program Files\Epic Games\UE_5.8` (engine changelist 58902052). Native BuildPlugin completed without code changes. Both distribution policies and the negative executable/tokenizer-integrity checks passed. The exact Windows archive passed all 14 Unreal tests; the installed plugin remained unchanged. No paid cloud request was made.
+
+- Windows archive SHA256: `2C45EE7163726C91B99E492A7806512119EEC6A044956E4BC9A7AAE0DADA171D`.
+- Local evidence: `.gpaa/native-smoke/a95a49a25e2d47cdbabfbbe1fef6f997/`.
+- UE 5.6 CI and reference .NET CI also passed for implementation commit `9e4957c` ([Unreal run](https://github.com/espritm/game-production-ai-assistant/actions/runs/42316608324), [.NET run](https://github.com/espritm/game-production-ai-assistant/actions/runs/42316608321)). UE 5.8.4 results above are local validation.
+
 ## Remaining release gates
 
-1. Install Unreal 5.8 and validate the source build and smoke suite against that version. Only UE 5.6 is currently installed on this machine. A corresponding `ue-5.8` runner label and `UE_5_8_ROOT` can be used by the updated workflow.
+1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.
 2. Test the exact precompiled archive on a clean user environment without .NET/Ollama and in a dedicated engine-plugin installation location. The current smoke test installs the plugin into a fresh project and checks for writes into the plugin directory.
 3. Review search relevance on representative real Unreal projects. The initial embedding model is English; equivalent French-query quality is not yet claimed.
 4. Complete the Fab publisher profile, product ID/`FabURL`, third-party software declaration, listing media and user-facing compatibility claims. Validate current Fab requirements before submitting. The source ZIP has a plugin parent folder and excludes Unreal build binaries; it is a review candidate, not an approved store artifact.
