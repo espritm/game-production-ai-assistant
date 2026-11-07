@@ -3,7 +3,8 @@ param(
     [string] $PackagePath,
     [string] $UnrealEngineRoot = 'C:\Program Files\Epic Games\UE_5.6',
     [int] $TimeoutSeconds = 300,
-    [string] $TestFilter = 'GPAA.Native'
+    [string] $TestFilter = 'GPAA.Native',
+    [switch] $EngineInstallation
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -12,6 +13,10 @@ if ([string]::IsNullOrWhiteSpace($PackagePath)) {$PackagePath=Join-Path $root '.
 $run = Join-Path $root ('.gpaa\native-smoke\' + [guid]::NewGuid().ToString('N'))
 $projectRoot = Join-Path $run 'Host'
 $plugin = Join-Path $projectRoot 'Plugins\GameProductionAIAssistant'
+if ($EngineInstallation) {
+    $plugin = Join-Path $UnrealEngineRoot 'Engine\Plugins\Marketplace\GameProductionAIAssistant'
+    if (Test-Path -LiteralPath $plugin) { throw 'Engine plugin destination already exists; refusing to overwrite it.' }
+}
 New-Item -ItemType Directory -Force -Path $plugin | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $projectRoot 'Config'),(Join-Path $projectRoot 'Content'),(Join-Path $projectRoot 'Source') | Out-Null
 if ([IO.Path]::GetExtension($PackagePath) -ieq '.zip') {
@@ -62,7 +67,7 @@ try {
     foreach ($file in $after) {
         if (-not $pluginBefore.ContainsKey($file.FullName) -or $pluginBefore[$file.FullName] -ne (Get-FileHash -LiteralPath $file.FullName).Hash) {throw "The plugin wrote into its installation: $($file.FullName)"}
     }
-    @{succeeded=$true;tests=$passed;testsWithWarnings=$result.succeededWithWarnings;installationUnchanged=$true;package=(Resolve-Path -LiteralPath $PackagePath).Path;
+    @{succeeded=$true;tests=$passed;testsWithWarnings=$result.succeededWithWarnings;installationUnchanged=$true;engineInstallation=[bool]$EngineInstallation;package=(Resolve-Path -LiteralPath $PackagePath).Path;
         archiveSHA256=$(if(Test-Path -LiteralPath $PackagePath -PathType Leaf){(Get-FileHash -LiteralPath $PackagePath).Hash}else{$null})} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'smoke-result.json') -Encoding UTF8
     Write-Host "PASS $passed native tests. Evidence: $run"

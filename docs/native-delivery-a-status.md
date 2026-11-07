@@ -16,7 +16,7 @@ The small embedding model is included in native archives. ONNX Runtime 1.20.1 an
 | 3 — Local search | Bundled embeddings, model identity versioning, exact vector ranking and Code/Assets result filtering | Broader retrieval quality beyond the controlled corpus |
 | 4 — Cloud and secrets | Responses and compatible Chat Completions, incremental SSE, cancellation, provider errors and OS credential store | An opt-in live request with the user's own provider account; CI uses simulated providers |
 | 5 — User workflows | Existing Slate panel connected to the native services; first-use instructions, key actions, consent, streaming, cancellation, references and history | Final manual UX acceptance |
-| 6 — Native distribution | Precompiled native ZIP, separate Fab source ZIP, dependency/policy checks and updated CI | UE 5.8.4 passed locally; clean-machine test, dedicated engine-plugin installation check, actual Fab listing/declaration/review |
+| 6 — Native distribution | Precompiled native ZIP, separate Fab source ZIP, dependency/policy checks and updated CI | UE 5.8.4 passed locally; clean-machine test, actual Fab listing/declaration/review |
 
 These are implemented development deliverables, not an assertion that all external release gates have passed. No Fab submission or publication has been performed.
 
@@ -43,10 +43,20 @@ Validated on 7 November 2026 using `C:\Program Files\Epic Games\UE_5.8` (engine 
 - Local evidence: `.gpaa/native-smoke/a95a49a25e2d47cdbabfbbe1fef6f997/`.
 - UE 5.6 CI and reference .NET CI also passed for implementation commit `9e4957c` ([Unreal run](https://github.com/espritm/game-production-ai-assistant/actions/runs/42316608324), [.NET run](https://github.com/espritm/game-production-ai-assistant/actions/runs/42316608321)). UE 5.8.4 results above are local validation.
 
+## Engine-plugin installation validation
+
+The UE 5.8 Windows ZIP was installed into `C:\Program Files\Epic Games\UE_5.8\Engine\Plugins\Marketplace\GameProductionAIAssistant`. A fresh host project loaded this engine installation and passed all 14 tests, with zero warnings and no changes to the installed plugin files. Evidence: `.gpaa/native-smoke/4eca4d158d104372b5327d42fa069986/`. The engine installation is retained for manual acceptance; the smoke script refuses to overwrite an existing installation.
+
+Repeat on an engine without an existing GPAA installation with `scripts/test-native-plugin.ps1 -UnrealEngineRoot <engine> -PackagePath <zip> -TestFilter GPAA -EngineInstallation`. The default remains a project-plugin installation. This does not establish clean-machine acceptance.
+
+The available `C:\Workspace\Unreal-test-proj\test_proj` has 434 assets and no project C++ source directory. It cannot establish retrieval relevance on a representative game codebase. A project path has been requested from the owner.
+
+A [store listing draft](fab-listing-draft.md) now records product copy, limitations, publisher inputs and the demonstration capture plan. No listing has been submitted.
+
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.
-2. Test the exact precompiled archive on a clean user environment without .NET/Ollama and in a dedicated engine-plugin installation location. The current smoke test installs the plugin into a fresh project and checks for writes into the plugin directory.
+2. Test the exact precompiled archive on a clean user environment without .NET/Ollama. Project-plugin and engine-plugin installation tests now pass on the developer machine; that machine still has development tooling installed.
 3. Review search relevance on representative real Unreal projects. The initial embedding model is English; equivalent French-query quality is not yet claimed.
 4. Complete the Fab publisher profile, product ID/`FabURL`, third-party software declaration, listing media and user-facing compatibility claims. Validate current Fab requirements before submitting. The source ZIP has a plugin parent folder and excludes Unreal build binaries; it is a review candidate, not an approved store artifact.
 
