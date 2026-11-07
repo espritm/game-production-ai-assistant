@@ -1,3 +1,4 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "GPAAssistantModule.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
@@ -8,8 +9,8 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 #include "Misc/CoreDelegates.h"
 #include "Settings/GPAAEditorSettings.h"
-#include "Services/GPAABackendSupervisor.h"
 #include "UI/SGPAAssistantWidget.h"
+#include "Application/GPAANativeRuntime.h"
 
 #define LOCTEXT_NAMESPACE "FGPAAssistantModule"
 
@@ -45,7 +46,7 @@ void FGPAAssistantModule::StartupModule()
 
 void FGPAAssistantModule::ShutdownModule()
 {
-    FGPAABackendSupervisor::ShutdownLaunchedBackend();
+    FGPAANativeRuntime::Shutdown();
     FCoreDelegates::OnEnginePreExit.Remove(EnginePreExitHandle);
 
     if (ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>(TEXT("Settings")))
@@ -63,7 +64,7 @@ void FGPAAssistantModule::ShutdownModule()
 
 void FGPAAssistantModule::HandleEnginePreExit()
 {
-    FGPAABackendSupervisor::ShutdownLaunchedBackend();
+    FGPAANativeRuntime::Shutdown();
 }
 
 void FGPAAssistantModule::RegisterMenus()

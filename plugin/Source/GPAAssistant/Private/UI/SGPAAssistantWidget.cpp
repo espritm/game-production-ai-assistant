@@ -1,7 +1,7 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "UI/SGPAAssistantWidget.h"
 
-#include "Application/GPAAChatSettingsWorkflow.h"
-#include "Application/GPAAProjectWorkflow.h"
+#include "Application/GPAANativeRuntime.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #include "Editor.h"
@@ -50,8 +50,6 @@ namespace
 
 void SGPAAssistantWidget::Construct(const FArguments& InArgs)
 {
-    HttpClient = MakeShared<FGPAAHttpClient>();
-    BackendSupervisor = MakeShared<FGPAABackendSupervisor>();
     InitializeSourceOpenerOptions();
     InitializeChatProviderOptions();
     SearchResultFilterModes.Add(MakeShared<FString>(SourceFilterAll));
@@ -104,6 +102,11 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             SNew(SButton)
                             .Text(LOCTEXT("OpenSettingsButton", "Settings"))
                             .OnClicked(this, &SGPAAssistantWidget::OnOpenSettingsClicked)
+                        ]
+                        + SHorizontalBox::Slot().AutoWidth().Padding(8,0,0,0)
+                        [
+                            SNew(SButton).Text(LOCTEXT("CancelNative", "Cancel"))
+                            .OnClicked(this, &SGPAAssistantWidget::OnCancelClicked)
                         ]
                     ]
                 ]
@@ -365,7 +368,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
         ]
     ];
 
-    LoadChatSettingsFromBackend();
+    LoadChatSettings();
     LoadKnowledgeStatus();
 }
 
@@ -386,54 +389,28 @@ FReply SGPAAssistantWidget::OnOpenSettingsClicked()
 FReply SGPAAssistantWidget::OnLoadChatSettingsClicked()
 {
     SetBusy(TEXT("Loading chat settings..."));
-    LoadChatSettingsFromBackend();
+    LoadChatSettings();
     return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnSaveChatSettingsClicked()
 {
     SetBusy(FString::Printf(TEXT("Saving chat settings for %s..."), *GetSelectedChatProviderName()));
-    SaveChatSettingsToBackend();
+    SaveChatSettings();
     return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnRefreshKnowledgeClicked()
 {
-    SetBusy(TEXT("Refreshing project knowledge..."));
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        FGPAAProjectWorkflow::RefreshKnowledge(
-            HttpClient,
-            GetBackendUrl(),
-            GetProjectRoot(),
-            BuildAssetMetadataSyncRequest(),
-            FGPAAWorkflowStatusChanged::CreateSP(this, &SGPAAssistantWidget::SetBusy),
-            FGPAAIndexUpdated::CreateSP(this, &SGPAAssistantWidget::UpdateKnowledgeSummary),
-            FGPAARequestCompleted::CreateLambda([this](bool bSucceeded, const FString& Message)
-            {
-                SetResult(bSucceeded, Message);
-                if (bSucceeded)
-                {
-                    LoadKnowledgeStatus();
-                }
-            }));
-    });
-    return FReply::Handled();
+    StartNative(false, true); return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnHistoryClicked()
 {
-    SetBusy(TEXT("Loading local chat history..."));
-    bHistoryVisible = true;
-
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        HttpClient->GetChatHistory(
-            GetBackendUrl(),
-            GetProjectRoot(),
-            FGPAARequestCompleted::CreateSP(this, &SGPAAssistantWidget::SetHistoryResult));
-    });
-
+    bHistoryVisible = true; SetBusy(TEXT("Loading local history..."));
+    TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
+    FGPAANativeRuntime::Get()->LoadHistory(GetProjectRoot(), [Weak](bool Ok, const FString& Message)
+    { if (auto Widget = Weak.Pin()) Widget->SetHistoryResult(Ok, Message); });
     return FReply::Handled();
 }
 
@@ -467,58 +444,51 @@ FReply SGPAAssistantWidget::OnSearchTabClicked()
 
 FReply SGPAAssistantWidget::OnSearchClicked()
 {
-    SetBusy(TEXT("Preparing project search..."));
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        FGPAAProjectWorkflow::Search(
-            HttpClient,
-            GetBackendUrl(),
-            GetProjectRoot(),
-            BuildAssetMetadataSyncRequest(),
-            GetSearchQuery(),
-            GetSelectedSourceFilterName(),
-            FGPAAWorkflowStatusChanged::CreateSP(this, &SGPAAssistantWidget::SetBusy),
-            FGPAAIndexUpdated::CreateSP(this, &SGPAAssistantWidget::UpdateKnowledgeSummary),
-            FGPAASearchCompleted::CreateSP(this, &SGPAAssistantWidget::SetSearchResult));
-    });
-
-    return FReply::Handled();
+    StartNative(false, false); return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnAskClicked()
 {
-    SetBusy(FString::Printf(TEXT("Preparing %s request..."), *GetSelectedChatProviderName()));
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        SetBusy(FString::Printf(TEXT("Saving %s settings..."), *GetSelectedChatProviderName()));
-        FGPAAChatSettingsWorkflow::Save(
-            HttpClient,
-            GetBackendUrl(),
-            GetChatSettingsFromUi(),
-            FGPAARequestCompleted::CreateLambda([this](bool bSucceeded, const FString& Message)
-            {
-                if (!bSucceeded)
-                {
-                    SetResult(false, Message);
-                    return;
-                }
+    StartNative(true, false); return FReply::Handled();
+}
 
-                ApplyChatSettingsResponse(true, Message);
-                SetBusy(FString::Printf(TEXT("Preparing %s request..."), *GetSelectedChatProviderName()));
-                FGPAAProjectWorkflow::Ask(
-                    HttpClient,
-                    GetBackendUrl(),
-                    GetProjectRoot(),
-                    BuildAssetMetadataSyncRequest(),
-                    GetPromptQuestion(),
-                    GetSelectedSourceFilterName(),
-                    GetSelectedChatProviderName(),
-                    FGPAAWorkflowStatusChanged::CreateSP(this, &SGPAAssistantWidget::SetBusy),
-                    FGPAAIndexUpdated::CreateSP(this, &SGPAAssistantWidget::UpdateKnowledgeSummary),
-                    FGPAAChatCompleted::CreateSP(this, &SGPAAssistantWidget::SetChatResult));
-            }));
-    });
+SGPAAssistantWidget::~SGPAAssistantWidget()
+{
+    FGPAANativeRuntime::CancelIfRunning();
+}
+
+FReply SGPAAssistantWidget::OnCancelClicked()
+{
+    NativeRequestId = FGuid::NewGuid();
+    FGPAANativeRuntime::Get()->Cancel(); StopBusy();
+    StatusText->SetText(FText::FromString(TEXT("Operation cancelled. Any partial response is kept in local history.")));
     return FReply::Handled();
+}
+
+void SGPAAssistantWidget::StartNative(bool Ask, bool RefreshOnly)
+{
+    LoadPluginSettings();
+    const FString Query = Ask ? GetPromptQuestion() : GetSearchQuery();
+    if (!RefreshOnly && Query.TrimStartAndEnd().IsEmpty()) { SetResult(false, TEXT("Enter a question or search query first.")); return; }
+    NativeRequestId = FGuid::NewGuid(); const FGuid RequestId = NativeRequestId;
+    TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
+    NativeAnswer.Reset(); SetBusy(TEXT("Preparing local project knowledge..."));
+    if (Ask) AnswerTextBox->SetText(FText::GetEmpty());
+    FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, RefreshOnly,
+        [Weak, RequestId](const FString& Message) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) W->SetBusy(Message); },
+        [Weak, RequestId](const FString& Delta) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) { W->NativeAnswer += Delta; W->AnswerTextBox->SetText(FText::FromString(W->NativeAnswer)); } },
+        [Weak, RequestId, Ask, RefreshOnly](bool Ok, const FString& Message, const FGPAANativeResult& Result)
+        {
+            auto W = Weak.Pin(); if (!W || W->NativeRequestId != RequestId) return;
+            W->UpdateKnowledgeSummary(Result.Statistics);
+            if (RefreshOnly) W->SetResult(Ok, Message);
+            else if (Ask)
+            {
+                W->SetChatResult(Ok, Message, Result.Answer, Result.Sources);
+                if (!Ok && !Result.Answer.IsEmpty()) W->AnswerTextBox->SetText(FText::FromString(Result.Answer + TEXT("\n\n[Interrupted] ") + Message));
+            }
+            else W->SetSearchResult(Ok, Message, Result.Sources);
+        });
 }
 
 FString SGPAAssistantWidget::BuildAssetMetadataSyncRequest() const
@@ -699,10 +669,9 @@ void SGPAAssistantWidget::InitializeSourceOpenerOptions()
 void SGPAAssistantWidget::InitializeChatProviderOptions()
 {
     ChatProviderModes.Reset();
-    ChatProviderModes.Add(MakeShared<FString>(ChatProviderOllama));
+    ChatProviderModes.Add(MakeShared<FString>(TEXT("OpenAI")));
     ChatProviderModes.Add(MakeShared<FString>(ChatProviderOpenAICompatible));
-    ChatProviderModes.Add(MakeShared<FString>(ChatProviderEcho));
-    SelectedChatProviderMode = ChatProviderModes[0];
+    SelectedChatProviderMode=ChatProviderModes[0];
 }
 
 void SGPAAssistantWidget::LoadPluginSettings()
@@ -750,66 +719,15 @@ void SGPAAssistantWidget::SavePluginSettings() const
     Settings->SaveConfig();
 }
 
-void SGPAAssistantWidget::EnsureBackendReady(const FString& BusyMessage, TFunction<void()> OnReady)
+
+void SGPAAssistantWidget::LoadChatSettings()
 {
-    if (!BackendSupervisor.IsValid())
-    {
-        SetResult(false, TEXT("The local backend supervisor is unavailable."));
-        return;
-    }
-
-    BackendSupervisor->EnsureBackendReady(
-        *GetDefault<UGPAAEditorSettings>(),
-        FGPAARequestCompleted::CreateLambda([this, BusyMessage](bool bSucceeded, const FString& Message)
-        {
-            SetBusy(bSucceeded ? Message : BusyMessage);
-        }),
-        FGPAARequestCompleted::CreateLambda([this, OnReady](bool bSucceeded, const FString& Message)
-        {
-            if (!bSucceeded)
-            {
-                SetResult(false, Message);
-                return;
-            }
-
-            OnReady();
-        }));
+    LoadPluginSettings(); SetResult(true, TEXT("Provider settings loaded locally."));
 }
 
-void SGPAAssistantWidget::LoadChatSettingsFromBackend()
+void SGPAAssistantWidget::SaveChatSettings()
 {
-    if (!HttpClient.IsValid())
-    {
-        return;
-    }
-
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        HttpClient->GetChatSettings(
-            GetBackendUrl(),
-            FGPAARequestCompleted::CreateSP(this, &SGPAAssistantWidget::ApplyChatSettingsResponse));
-    });
-}
-
-void SGPAAssistantWidget::SaveChatSettingsToBackend()
-{
-    if (!HttpClient.IsValid())
-    {
-        return;
-    }
-
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        FGPAAChatSettingsWorkflow::Save(
-            HttpClient,
-            GetBackendUrl(),
-            GetChatSettingsFromUi(),
-            FGPAARequestCompleted::CreateLambda([this](bool bSucceeded, const FString& Message)
-            {
-                ApplyChatSettingsResponse(bSucceeded, Message);
-                SetResult(bSucceeded, bSucceeded ? TEXT("Chat settings saved.") : Message);
-            }));
-    });
+    SavePluginSettings(); SetResult(true, TEXT("Provider settings saved. Personal keys are managed in Settings."));
 }
 
 void SGPAAssistantWidget::ApplyChatSettingsResponse(bool bSucceeded, const FString& Message)
@@ -851,18 +769,7 @@ void SGPAAssistantWidget::ApplyChatSettingsResponse(bool bSucceeded, const FStri
 
 void SGPAAssistantWidget::LoadKnowledgeStatus()
 {
-    if (!HttpClient.IsValid())
-    {
-        return;
-    }
-
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        HttpClient->GetKnowledgeStatus(
-            GetBackendUrl(),
-            GetProjectRoot(),
-            FGPAARequestCompleted::CreateSP(this, &SGPAAssistantWidget::ApplyKnowledgeStatusResponse));
-    });
+    KnowledgeText->SetText(FText::FromString(TEXT("First use: Settings > choose provider and model > Save Personal Key > Cloud Context Consent. Then Refresh Knowledge and Ask. API usage is billed by your provider. Search works offline.")));
 }
 
 void SGPAAssistantWidget::ApplyKnowledgeStatusResponse(bool bSucceeded, const FString& Message)
@@ -989,16 +896,8 @@ FText SGPAAssistantWidget::GetSelectedSearchResultFilterText() const
 
 FText SGPAAssistantWidget::GetSettingsSummaryText() const
 {
-    const UGPAAEditorSettings* Settings = GetDefault<UGPAAEditorSettings>();
-    const FString Model = Settings->ChatProvider.Equals(ChatProviderOpenAICompatible, ESearchCase::IgnoreCase)
-        ? Settings->OpenAIModel
-        : Settings->ChatProvider;
-
-    return FText::FromString(FString::Printf(
-        TEXT("Provider: %s | Backend: %s | Source opener: %s"),
-        *Model,
-        *Settings->BackendUrl,
-        *Settings->SourceOpenerMode));
+    const auto* Settings=GetDefault<UGPAAEditorSettings>();
+    return FText::FromString(FString::Printf(TEXT("Provider: %s | Model: %s | Search: local"),*Settings->ChatProvider,*Settings->OpenAIModel));
 }
 
 EVisibility SGPAAssistantWidget::GetHistoryVisibility() const
@@ -1020,10 +919,6 @@ EVisibility SGPAAssistantWidget::GetOpenAICompatibleSettingsVisibility() const
         : EVisibility::Collapsed;
 }
 
-FString SGPAAssistantWidget::GetBackendUrl() const
-{
-    return GetDefault<UGPAAEditorSettings>()->BackendUrl;
-}
 
 FString SGPAAssistantWidget::GetProjectRoot() const
 {

@@ -1,3 +1,4 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "Presentation/GPAAKnowledgePresenter.h"
 
 FString FGPAAKnowledgePresenter::FormatKnowledgeStatus(const FGPAAKnowledgeStatus& Status)

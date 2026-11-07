@@ -1,5 +1,7 @@
 # Unreal Editor Plugin
 
+For the current native 0.2.0 plugin, use the [native user guide](native-user-guide.md). The backend lifecycle and packaging instructions in this document describe the historical 0.1.0 edition retained as a reference.
+
 ## Status
 
 The V1 plugin is an Editor-only Unreal plugin scaffold. It opens a dockable assistant panel and connects to the local backend over HTTP.

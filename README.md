@@ -4,7 +4,9 @@ An open-source, local-first AI assistant for AAA game production pipelines.
 
 ## Current Implementation Status
 
-The repository now contains the first local backend foundation for V1:
+The repository contains the original V1 backend and a native Unreal migration for delivery A. The native plugin embeds local CPU search and connects directly to a user-selected cloud chat provider, without requiring a companion application. UE 5.6 validation is available; UE 5.8 and the remaining Fab release gates are tracked in [Native delivery A status](docs/native-delivery-a-status.md).
+
+The original foundation includes:
 
 - ASP.NET Core local API
 - project file scanning
@@ -23,6 +25,15 @@ The repository now contains the first local backend foundation for V1:
 - developer and user documentation
 
 ## Quick Start
+
+Build and validate the native plugin (build-time dependency downloads are pinned by SHA256):
+
+```powershell
+.\scripts\package-native-plugin.ps1
+.\scripts\test-native-plugin.ps1 -PackagePath .gpaa\releases\GameProductionAIAssistant-native-v0.2.0-UE5.6-Win64.zip -TestFilter GPAA
+```
+
+Read the [native user guide](docs/native-user-guide.md) and the [implementation plan](docs/native-plugin-implementation-plan.md). For the retained .NET reference backend, use the following commands.
 
 Use the .NET 10 SDK to build the `.slnx` solution. The application targets .NET 8; install the .NET 8 runtime for development runs. Distribution packages include their own runtime.
 

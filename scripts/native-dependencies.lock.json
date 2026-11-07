@@ -1,0 +1,58 @@
+{
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "assets": [
+    {
+      "name": "onnxruntime-win-x64-1.20.1.zip",
+      "url": "https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-win-x64-1.20.1.zip",
+      "sha256": "78d447051e48bd2e1e778bba378bec4ece11191c9e538cf7b2c4a4565e8f5581",
+      "destination": "plugin/Source/ThirdParty/OnnxRuntime",
+      "entries": [
+        {
+          "source": "onnxruntime-win-x64-1.20.1/include/onnxruntime_c_api.h",
+          "target": "include/onnxruntime_c_api.h",
+          "sha256": "b0176725a7cc6d44c9de973330422433684ae3144e6b300ec2df755a2e6bcf64"
+        },
+        {
+          "source": "onnxruntime-win-x64-1.20.1/lib/onnxruntime.dll",
+          "target": "Win64/gpaa_onnxruntime.dll",
+          "sha256": "4cb41e89b8bf30578e1dd95e9c40292d61974a4bfcd666409302c4f0c5aa8ce0"
+        },
+        {
+          "source": "onnxruntime-win-x64-1.20.1/LICENSE",
+          "target": "LICENSE",
+          "sha256": "c250d6278f0b47a6439fb7592b08b58a55eb9f535aa49a1db63211c3f982b674"
+        },
+        {
+          "source": "onnxruntime-win-x64-1.20.1/ThirdPartyNotices.txt",
+          "target": "ThirdPartyNotices.txt",
+          "sha256": "fac5bb85f568b38fd8f3a6aea32737985841f23a1a43e9ce952f79474f883aa9"
+        }
+      ]
+    },
+    {
+      "name": "minilm-model.onnx",
+      "url": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/onnx/model.onnx",
+      "sha256": "6fd5d72fe4589f189f8ebc006442dbb529bb7ce38f8082112682524616046452",
+      "destination": "plugin/Source/ThirdParty/MiniLM/model.onnx"
+    },
+    {
+      "name": "minilm-vocab.txt",
+      "url": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/vocab.txt",
+      "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3",
+      "destination": "plugin/Source/ThirdParty/MiniLM/vocab.txt"
+    },
+    {
+      "name": "minilm-LICENSE",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "destination": "plugin/Source/ThirdParty/MiniLM/LICENSE"
+    },
+    {
+      "name": "minilm-MODEL_CARD.md",
+      "url": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/README.md",
+      "sha256": "dcd602d2fd35c203a247304a06fec6654a12f7941b739f9221a064fe8dc3b7f0",
+      "destination": "plugin/Source/ThirdParty/MiniLM/MODEL_CARD.md"
+    }
+  ]
+}

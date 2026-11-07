@@ -1,10 +1,10 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #pragma once
 
 #include "CoreMinimal.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
-#include "Services/GPAAHttpClient.h"
-#include "Services/GPAABackendSupervisor.h"
+#include "Models/GPAAApiModels.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Views/SListView.h"
@@ -24,8 +24,13 @@ public:
     SLATE_END_ARGS()
 
     void Construct(const FArguments& InArgs);
+    virtual ~SGPAAssistantWidget() override;
 
 private:
+    FReply OnCancelClicked();
+    void StartNative(bool Ask, bool RefreshOnly);
+    FGuid NativeRequestId;
+    FString NativeAnswer;
     FReply OnOpenSettingsClicked();
     FReply OnLoadChatSettingsClicked();
     FReply OnSaveChatSettingsClicked();
@@ -49,9 +54,8 @@ private:
     void InitializeChatProviderOptions();
     void LoadPluginSettings();
     void SavePluginSettings() const;
-    void EnsureBackendReady(const FString& BusyMessage, TFunction<void()> OnReady);
-    void LoadChatSettingsFromBackend();
-    void SaveChatSettingsToBackend();
+    void LoadChatSettings();
+    void SaveChatSettings();
     void ApplyChatSettingsResponse(bool bSucceeded, const FString& Message);
     void LoadKnowledgeStatus();
     void ApplyKnowledgeStatusResponse(bool bSucceeded, const FString& Message);
@@ -72,7 +76,6 @@ private:
     EVisibility GetHistoryVisibility() const;
     EVisibility GetCustomSourceOpenerVisibility() const;
     EVisibility GetOpenAICompatibleSettingsVisibility() const;
-    FString GetBackendUrl() const;
     FString GetProjectRoot() const;
     FString GetPromptQuestion() const;
     FString GetSearchQuery() const;
@@ -84,8 +87,6 @@ private:
     EActiveTimerReturnType HandleBusyTick(double InCurrentTime, float InDeltaTime);
     void StopBusy();
 
-    TSharedPtr<FGPAAHttpClient> HttpClient;
-    TSharedPtr<FGPAABackendSupervisor, ESPMode::ThreadSafe> BackendSupervisor;
     TSharedPtr<SComboBox<TSharedPtr<FString>>> SourceOpenerComboBox;
     TSharedPtr<SEditableTextBox> SourceOpenerTextBox;
     TSharedPtr<SComboBox<TSharedPtr<FString>>> ChatProviderComboBox;

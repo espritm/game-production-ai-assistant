@@ -1,3 +1,4 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "Services/GPAASourceOpener.h"
 
 #include "HAL/FileManager.h"

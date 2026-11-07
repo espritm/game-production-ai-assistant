@@ -1,3 +1,4 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #pragma once
 
 #include "CoreMinimal.h"
