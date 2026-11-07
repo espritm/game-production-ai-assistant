@@ -80,6 +80,14 @@ The kit has been extracted and exercised locally with the 14 standard tests. Fin
 
 The [submission preparation record](fab-submission-readiness.md) covers current evidence, runtime DLL inspection, media specifications checked against Epic documentation and outstanding owner inputs. Standard plugin directories are now explicitly retained in ZIPs even when empty. Publisher identity, support contact and pricing are confirmed: Maxime ESPRIT, contact@maximeesprit.fr, free. The descriptor author and listing draft are updated; store license selection and store-assigned URLs remain pending. Previously generated archives and the transfer kit retain their validated bytes; rebuild them to include these metadata/documentation updates.
 
+## Manual acceptance fix — opening asset references
+
+The owner confirmed indexing and retrieval in the prepared real-asset host, then reported that **Open** only displayed the inherited virtual-metadata message. The opener previously returned success without activating an asset editor. It now resolves native `asset:/Game/...` object paths (and legacy metadata object paths), validates them and opens the object through Unreal's AssetEditorSubsystem. Invalid references return failure; code references retain their external-editor behavior.
+
+A regression test covers native/legacy path resolution, malformed references and actual editor activation/closure with a transient curve asset. All 15 standard tests pass locally on UE 5.8.4 with zero warnings. Evidence: `.gpaa/native-smoke/1b2d3a39982f42b593240644b1e7bdbf/`. Windows archive SHA256: `E9D72B31B82F7F32FE7569CDE9B3ECFCFA2747B8CD09DBA3D742ADFA1562799D`.
+
+After the owner closed Unreal, this archive was installed into the existing manual host `.gpaa/native-smoke/6d44a8acea324893a9bc6a2c7a23d5ea/Host/Plugins/GameProductionAIAssistant`, with installed file hashes checked against the package and the previous plugin backed up under `.gpaa/manual-plugin-backups`. The original project and engine installation were not modified. Manual confirmation that the pistol animation opens remains pending. Earlier transfer kits refer to the older validated archives and must be regenerated for final distribution.
+
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.

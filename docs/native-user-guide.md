@@ -17,6 +17,8 @@ This editor-only Windows plugin indexes your project and searches it locally. It
 
 Responses appear progressively. **Cancel** stops the current operation; partial chat responses are retained in history as interrupted. Search results include source references and the existing source-opening options. Unreal asset metadata is a virtual source, not deep Blueprint graph analysis.
 
+Click **Open** on an asset result to open that object in its Unreal asset editor. Code results use your configured external source editor. If an asset has been moved or deleted, refresh knowledge and search again; an unresolved reference is reported as a failure.
+
 ## Local data
 
 The index and recent history are stored under `<YourProject>/Saved/GPAA/native-v1.sqlite`. Models and the inference runtime are read from the installed plugin; the plugin never writes index data into its installation directory. The SQLite database uses transactions and versioned embedding identities. A changed embedding pipeline rebuilds vectors instead of mixing incompatible indexes.
