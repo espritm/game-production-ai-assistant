@@ -21,8 +21,8 @@ Inspection of the shipped ONNX DLL with Microsoft's `dumpbin /DEPENDENTS` shows 
 
 | Item | State / next action |
 |---|---|
-| Publisher identity and support contact | Await owner input; do not invent values in the descriptor |
-| Pricing and store license selection | Await owner decision |
+| Publisher identity and support contact | Confirmed: Maxime ESPRIT, contact@maximeesprit.fr; descriptor author updated |
+| Pricing and store license selection | Confirmed free; final store license selection remains pending |
 | Product identifier and FabURL | Fill from the actual listing once assigned |
 | Product copy | [Draft available](fab-listing-draft.md); review before submission |
 | Third-party software | [Inventory available](native-third-party-notices.md); complete the actual publisher declaration/review |

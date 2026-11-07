@@ -1,5 +1,7 @@
 # Native Game Production AI Assistant
 
+Publisher: Maxime ESPRIT. Support: contact@maximeesprit.fr. The plugin is free; cloud API usage is billed separately by your provider.
+
 This editor-only Windows plugin indexes your project and searches it locally. Its native mode does not require .NET, Ollama, Python or a companion application. The small CPU embedding model is included in the package. Chat generation uses your own cloud provider account; local chat generation is a later delivery.
 
 ## First use

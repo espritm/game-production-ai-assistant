@@ -6,6 +6,13 @@ Working copy for publisher review. This document has not been submitted to Fab. 
 
 Game Production AI Assistant
 
+## Publisher and price
+
+- Publisher: Maxime ESPRIT.
+- Support: contact@maximeesprit.fr.
+- Product price: Free, as confirmed by the publisher.
+- Cloud provider usage is billed separately by the selected provider. A free plugin does not include API credits.
+
 ## Short description
 
 Search your Unreal project locally and ask a cloud AI assistant questions grounded in your source files and asset metadata.
@@ -43,9 +50,9 @@ Local indexing and search run inside Unreal. The index and history live under `<
 
 ## Publisher inputs still needed
 
-- Final publisher identity, support contact and product/support URLs.
+- Product/support website URLs, if used; the confirmed support email is above.
 - Store-assigned product identifier and the corresponding plugin `FabURL`.
-- Pricing and the final store license selection.
+- Final store license selection. Free pricing does not change the repository license or automatically select a store license.
 - Product icon, gallery images and a short demonstration captured from the final UI.
 - Third-party software declarations reviewed against [the bundled inventory](native-third-party-notices.md), including the model and inference runtime.
 
