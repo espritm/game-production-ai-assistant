@@ -15,6 +15,7 @@ class SMultiLineEditableTextBox;
 class STableViewBase;
 class STextBlock;
 class SWidgetSwitcher;
+enum class ECheckBoxState : uint8;
 class ITableRow;
 
 class SGPAAssistantWidget final : public SCompoundWidget
@@ -29,6 +30,7 @@ public:
 private:
     friend class FGPAAHistoryLayoutTest;
     friend class FGPAAPromptLayoutTest;
+    friend class FGPAASearchLayoutTest;
     void SetAnswerText(const FString& Text);
     TSharedPtr<SWidgetSwitcher> MainViewSwitcher;
     FReply OnCancelClicked();
@@ -63,14 +65,14 @@ private:
     FGPAAChatSettings GetChatSettingsFromUi() const;
     void OnSourceOpenerModeChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
     void OnChatProviderChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
-    void OnSearchResultFilterChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
+    TSharedRef<SWidget> MakeSearchScopeRadio(const FText& Label, const FString& Scope);
+    ECheckBoxState GetSearchScopeCheckState(FString Scope) const;
+    void OnSearchScopeChanged(ECheckBoxState State, FString Scope);
     void OnCustomSourceOpenerCommitted(const FText& Text, ETextCommit::Type CommitType);
     TSharedRef<SWidget> GenerateSourceOpenerModeWidget(TSharedPtr<FString> Item) const;
     TSharedRef<SWidget> GenerateChatProviderWidget(TSharedPtr<FString> Item) const;
-    TSharedRef<SWidget> GenerateSearchResultFilterWidget(TSharedPtr<FString> Item) const;
     FText GetSelectedSourceOpenerModeText() const;
     FText GetSelectedChatProviderText() const;
-    FText GetSelectedSearchResultFilterText() const;
     FText GetSettingsSummaryText() const;
     EVisibility GetCustomSourceOpenerVisibility() const;
     EVisibility GetOpenAICompatibleSettingsVisibility() const;
@@ -90,7 +92,6 @@ private:
     TSharedPtr<SComboBox<TSharedPtr<FString>>> ChatProviderComboBox;
     TSharedPtr<SEditableTextBox> PromptQuestionTextBox;
     TSharedPtr<SEditableTextBox> SearchQueryTextBox;
-    TSharedPtr<SComboBox<TSharedPtr<FString>>> SearchResultFilterComboBox;
     TSharedPtr<SWidgetSwitcher> TabSwitcher;
     TSharedPtr<STextBlock> StatusText;
     TSharedPtr<STextBlock> SettingsSummaryText;
@@ -102,9 +103,8 @@ private:
     TSharedPtr<FString> SelectedSourceOpenerMode;
     TArray<TSharedPtr<FString>> ChatProviderModes;
     TSharedPtr<FString> SelectedChatProviderMode;
-    TArray<TSharedPtr<FString>> SearchResultFilterModes;
-    TSharedPtr<FString> SelectedSearchResultFilterMode;
     FString CustomSourceOpenerCommand = TEXT("code -g \"{file}:{line}\"");
+    FString SelectedSearchScope = TEXT("All");
     FString BusyBaseMessage;
     int32 BusyFrame = 0;
     int32 ActiveTabIndex = 0;

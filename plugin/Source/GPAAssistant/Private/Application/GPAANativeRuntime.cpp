@@ -219,7 +219,8 @@ bool FGPAANativeRuntime::RefreshIfIdle(const FString& ProjectRoot, const FString
 void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSnapshot, const FString &Query, bool Ask,
                              bool RefreshOnly, TFunction<void(const FString &)> OnStatus,
                              TFunction<void(const FString &)> OnText,
-                             TFunction<void(bool, const FString &, const FGPAANativeResult &)> OnFinished)
+                             TFunction<void(bool, const FString &, const FGPAANativeResult &)> OnFinished,
+                             const FString& SearchScope)
 {
     Cancel();
     Jobs.RemoveAll([](TFuture<void> &Job) { return Job.IsReady(); });
@@ -271,7 +272,7 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
     Jobs.Add(Async(
         EAsyncExecution::ThreadPool,
         [Self, Weak, Task, ProjectRoot, AssetSnapshot, Query, Ask, RefreshOnly, ChatRequest, OnStatus, OnText,
-         OnFinished]() mutable
+         OnFinished, SearchScope]() mutable
         {
             FString Error;
             FGPAAIndexReport Report;
@@ -296,7 +297,7 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
                                                        });
                                      });
                 if (Ok && !RefreshOnly)
-                    Ok = FGPAACore::Search(Query, TEXT("All"), 8, *Self->Embeddings, Store, Task, Sources, Error);
+                    Ok = FGPAACore::Search(Query, SearchScope, 8, *Self->Embeddings, Store, Task, Sources, Error);
                 if (Ok && Ask)
                 {
                     int32 Characters = 0, Keep = 0;

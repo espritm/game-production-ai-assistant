@@ -20,7 +20,8 @@ class FGPAANativeRuntime : public TSharedFromThis<FGPAANativeRuntime, ESPMode::T
     static void CancelIfRunning();
     void Run(const FString &ProjectRoot, const FString &AssetSnapshot, const FString &Query, bool Ask, bool RefreshOnly,
              TFunction<void(const FString &)> OnStatus, TFunction<void(const FString &)> OnText,
-             TFunction<void(bool, const FString &, const FGPAANativeResult &)> OnFinished);
+             TFunction<void(bool, const FString &, const FGPAANativeResult &)> OnFinished,
+             const FString& SearchScope = TEXT("All"));
     void LoadHistory(const FString &ProjectRoot, TFunction<void(bool, const FString &)> OnFinished);
     void ImportHistory(const FString &ProjectRoot, const FString &JsonPath,
                        TFunction<void(bool, const FString &)> OnFinished);

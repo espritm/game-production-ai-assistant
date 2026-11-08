@@ -7,6 +7,8 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #include "Editor.h"
 #include "ISettingsModule.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SCheckBox.h"
+#include "Styling/AppStyle.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
@@ -52,10 +54,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
 {
     InitializeSourceOpenerOptions();
     InitializeChatProviderOptions();
-    SearchResultFilterModes.Add(MakeShared<FString>(SourceFilterAll));
-    SearchResultFilterModes.Add(MakeShared<FString>(SearchResultFilterCode));
-    SearchResultFilterModes.Add(MakeShared<FString>(SearchResultFilterAssets));
-    SelectedSearchResultFilterMode = SearchResultFilterModes[0];
     LoadPluginSettings();
 
     ChildSlot
@@ -199,10 +197,17 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
 
                         + SVerticalBox::Slot()
                         .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
+                        .Padding(0.0f, 0.0f, 0.0f, 8.0f)
                         [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("SearchQueryLabel", "Search query"))
+                            SNew(SHorizontalBox)
+                            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                            [SNew(STextBlock).Text(LOCTEXT("SearchScopeLabel", "Search in"))]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(12,0,0,0)
+                            [MakeSearchScopeRadio(LOCTEXT("AssetScope", "Asset"), SearchResultFilterAssets)]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(12,0,0,0)
+                            [MakeSearchScopeRadio(LOCTEXT("CodeScope", "Code"), SearchResultFilterCode)]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(12,0,0,0)
+                            [MakeSearchScopeRadio(LOCTEXT("CombinedScope", "Asset and Code"), SourceFilterAll)]
                         ]
 
                         + SVerticalBox::Slot()
@@ -216,7 +221,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .Padding(0.0f, 0.0f, 8.0f, 0.0f)
                             [
                                 SAssignNew(SearchQueryTextBox, SEditableTextBox)
-                                .Text(LOCTEXT("SearchPlaceholder", "Where is stamina regeneration handled?"))
+                                .HintText(LOCTEXT("SearchPlaceholder", "Search"))
                             ]
 
                             + SHorizontalBox::Slot()
@@ -225,29 +230,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                                 SNew(SButton)
                                 .Text(LOCTEXT("SearchButton", "Search"))
                                 .OnClicked(this, &SGPAAssistantWidget::OnSearchClicked)
-                            ]
-                        ]
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
-                        [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("SearchFilterLabel", "Filter"))
-                        ]
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 8.0f)
-                        [
-                            SAssignNew(SearchResultFilterComboBox, SComboBox<TSharedPtr<FString>>)
-                            .OptionsSource(&SearchResultFilterModes)
-                            .InitiallySelectedItem(SelectedSearchResultFilterMode)
-                            .OnSelectionChanged(this, &SGPAAssistantWidget::OnSearchResultFilterChanged)
-                            .OnGenerateWidget(this, &SGPAAssistantWidget::GenerateSearchResultFilterWidget)
-                            [
-                                SNew(STextBlock)
-                                .Text(this, &SGPAAssistantWidget::GetSelectedSearchResultFilterText)
                             ]
                         ]
 
@@ -427,7 +409,7 @@ void SGPAAssistantWidget::StartNative(bool Ask)
                 if (!Ok && !Result.Answer.IsEmpty()) W->SetAnswerText(Result.Answer + TEXT("\n\n[Interrupted] ") + Message);
             }
             else W->SetSearchResult(Ok, Message, Result.Sources);
-        });
+        }, Ask ? SourceFilterAll : GetSelectedSourceFilterName());
 }
 
 FString SGPAAssistantWidget::BuildAssetMetadataSyncRequest() const
@@ -455,7 +437,7 @@ void SGPAAssistantWidget::SetBusyFromWorkflow(bool bSucceeded, const FString& Me
 void SGPAAssistantWidget::SetResult(bool bSucceeded, const FString& Message)
 {
     StopBusy();
-    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Done") : TEXT("Error")));
+    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Ready") : TEXT("Error")));
     SetAnswerText(Message);
 }
 
@@ -738,13 +720,22 @@ void SGPAAssistantWidget::OnChatProviderChanged(TSharedPtr<FString> NewSelection
     }
 }
 
-void SGPAAssistantWidget::OnSearchResultFilterChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo)
+TSharedRef<SWidget> SGPAAssistantWidget::MakeSearchScopeRadio(const FText& Label, const FString& Scope)
 {
-    if (NewSelection.IsValid())
-    {
-        SelectedSearchResultFilterMode = NewSelection;
-    }
-
+    return SNew(SCheckBox)
+        .Style(FAppStyle::Get(), "RadioButton")
+        .IsChecked(this, &SGPAAssistantWidget::GetSearchScopeCheckState, Scope)
+        .OnCheckStateChanged(this, &SGPAAssistantWidget::OnSearchScopeChanged, Scope)
+        [SNew(STextBlock).Text(Label)];
+}
+ECheckBoxState SGPAAssistantWidget::GetSearchScopeCheckState(FString Scope) const
+{
+    return SelectedSearchScope == Scope ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+}
+void SGPAAssistantWidget::OnSearchScopeChanged(ECheckBoxState State, FString Scope)
+{
+    if (State != ECheckBoxState::Checked) return;
+    SelectedSearchScope = Scope;
     RebuildFilteredSearchResults();
     RefreshSourceLists();
 }
@@ -767,12 +758,6 @@ TSharedRef<SWidget> SGPAAssistantWidget::GenerateChatProviderWidget(TSharedPtr<F
         .Text(FText::FromString(Item.IsValid() ? *Item : ChatProviderOllama));
 }
 
-TSharedRef<SWidget> SGPAAssistantWidget::GenerateSearchResultFilterWidget(TSharedPtr<FString> Item) const
-{
-    return SNew(STextBlock)
-        .Text(FText::FromString(Item.IsValid() ? *Item : SourceFilterAll));
-}
-
 FText SGPAAssistantWidget::GetSelectedSourceOpenerModeText() const
 {
     return FText::FromString(SelectedSourceOpenerMode.IsValid() ? *SelectedSourceOpenerMode : SourceOpenerAuto);
@@ -781,11 +766,6 @@ FText SGPAAssistantWidget::GetSelectedSourceOpenerModeText() const
 FText SGPAAssistantWidget::GetSelectedChatProviderText() const
 {
     return FText::FromString(SelectedChatProviderMode.IsValid() ? *SelectedChatProviderMode : ChatProviderOllama);
-}
-
-FText SGPAAssistantWidget::GetSelectedSearchResultFilterText() const
-{
-    return FText::FromString(SelectedSearchResultFilterMode.IsValid() ? *SelectedSearchResultFilterMode : SourceFilterAll);
 }
 
 FText SGPAAssistantWidget::GetSettingsSummaryText() const
@@ -831,7 +811,7 @@ FString SGPAAssistantWidget::GetSelectedChatProviderName() const
 
 FString SGPAAssistantWidget::GetSelectedSourceFilterName() const
 {
-    return SourceFilterAll;
+    return SelectedSearchScope;
 }
 
 FString SGPAAssistantWidget::GetSourceOpenerCommand() const
@@ -843,9 +823,7 @@ void SGPAAssistantWidget::RebuildFilteredSearchResults()
 {
     FilteredSearchResults.Reset();
 
-    const FString Filter = SelectedSearchResultFilterMode.IsValid()
-        ? *SelectedSearchResultFilterMode
-        : SourceFilterAll;
+    const FString& Filter = SelectedSearchScope;
 
     for (const TSharedPtr<FGPAASourceReference>& Result : SearchResults)
     {

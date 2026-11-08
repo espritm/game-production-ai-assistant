@@ -116,6 +116,14 @@ A geometry regression checks the actual arrangement of a short answer at the bot
 
 The verified archive was installed into GPAA_Manual while Unreal was closed, with a backup and installed file hash verification. Manual visual acceptance remains pending.
 
+## Search controls and Ready status — 8 November 2026
+
+The generic successful-task state now reads Ready instead of Done. Search starts with an empty field and the hint `Search`; the redundant Search query and Filter labels are removed. The former dropdown is replaced by three exclusive radio controls above the input: Search in — Asset, Code, Asset and Code. Combined scope is the default. The chosen scope filters the displayed results and is passed into native retrieval before ranking/top-K, so asset-only/code-only searches cannot lose matching sources because the opposite type filled the global top results. Ask continues to retrieve all source types.
+
+New regression coverage checks control order, an empty search field and exact hint, exclusive selection, result filtering, Ready status, and an end-to-end asset-only query against an index containing both code and assets. All 21 standard tests pass locally on UE 5.8.4 with no warnings. Evidence: `.gpaa/native-smoke/7a01b8c0639d459ea9664c0401a75953/`. Windows archive SHA256: `1545116A5B2F16E4CEFE1A9047CDA0315204E484B1599BA97F4FE2FD802958D0`.
+
+After the owner closed Unreal, the verified package was installed into GPAA_Manual with a backup and file hash verification. Manual visual acceptance remains pending.
+
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.
