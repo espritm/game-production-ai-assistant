@@ -35,19 +35,18 @@ class UGPAAEditorSettings final : public UDeveloperSettings
     int32 MaxOutputTokens = 512;
     UPROPERTY(EditAnywhere, Config, Category = "Source Opener") FString SourceOpenerMode;
     UPROPERTY(EditAnywhere, Config, Category = "Source Opener") FString CustomSourceOpenerCommand;
-    UPROPERTY(EditAnywhere, Config, Category = "Import / Export") FString ExportProfilePath;
-    UPROPERTY(EditAnywhere, Config, Category = "Import / Export") FString ImportProfilePath;
-    UPROPERTY(EditAnywhere, Config, Category = "Import / Export") FString LegacyHistoryPath;
-    UPROPERTY(VisibleAnywhere, Transient, Category = "Diagnostics") FString LastDiagnosticsResult;
+    FString LastKeyResult;
+    FString LastProfileResult;
     UFUNCTION(CallInEditor, Category = "Chat", meta = (DisplayName = "Save Personal Key")) void SavePersonalKey();
     UFUNCTION(CallInEditor, Category = "Chat", meta = (DisplayName = "Remove Personal Key")) void RemovePersonalKey();
-    UFUNCTION(CallInEditor, Category = "Diagnostics", meta = (DisplayName = "Check Assistant")) void CheckAssistant();
-    UFUNCTION(CallInEditor, Category = "Diagnostics", meta = (DisplayName = "Test Prompt IA (Billable)"))
-    void TestPromptIA();
     UFUNCTION(CallInEditor, Category = "Import / Export") void ExportSettingsProfile();
     UFUNCTION(CallInEditor, Category = "Import / Export") void ImportSettingsProfile();
-    UFUNCTION(CallInEditor, Category = "Import / Export") void ImportLegacyChatHistory();
+    bool ExportSettingsProfileToFile(const FString& Path);
+    bool ImportSettingsProfileFromFile(const FString& Path);
     FString GetResolvedProjectRoot() const;
     FGPAAChatSettings ToChatSettings() const;
     void ApplyChatSettings(const FGPAAChatSettings &Settings);
+  private:
+    bool ChooseProfileFile(bool Save, FString& Path);
+    FString LastProfileDirectory;
 };

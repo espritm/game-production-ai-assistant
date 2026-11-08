@@ -144,6 +144,12 @@ All 24 standard tests pass locally on UE 5.8.4. A separate isolated-process shut
 
 CI includes the isolated shutdown acceptance process via `test-native-plugin.ps1 -HttpShutdownAcceptance`, in addition to the standard suite and automatic-index smoke. The deployment procedure backs up the closed manual project's local GPAA data before the history migration as well as retaining a plugin backup. Installation and manual acceptance depend on the editor being closed.
 
+## Settings layout and profile dialogs — 8 November 2026
+
+Personal-key actions now share the masked API-key field row. Diagnostics, legacy-history import and the three manual path fields are removed from Settings. Export opens a native save dialog; import opens a native JSON file picker. Cancelling leaves settings and files unchanged. Profile serialization still excludes secrets and import resets cloud consent. The last selected folder is remembered for the session.
+
+UE 5.8.4 compilation and all 24 standard tests pass. The real Details view test checks the shared credential row and removed controls; profile tests cover a selected-path round trip, secret exclusion, consent reset and malformed input. Evidence: `.gpaa/native-smoke/973cbb61d3b4440aa2f8804835494fa4/`. Windows ZIP SHA256: `3AC7BB45D592F77235346E50DE6C4214D59AFF9954C1D542A8258EAC720914AC`. Native file-dialog interaction remains a manual check.
+
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.

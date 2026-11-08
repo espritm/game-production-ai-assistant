@@ -242,14 +242,24 @@ bool FGPAANativeSecretTest::RunTest(const FString &Parameters)
     TestTrue(TEXT("API keys are transient and not config properties"),
              Key && Key->HasAnyPropertyFlags(CPF_Transient) && !Key->HasAnyPropertyFlags(CPF_Config));
     auto *Settings = NewObject<UGPAAEditorSettings>();
-    Settings->ExportProfilePath =
+    const FString ExportPath =
         FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("GPAA/test-profile.json"));
     Settings->OpenAIApiKey = TEXT("not-a-real-secret");
-    IFileManager::Get().MakeDirectory(*FPaths::GetPath(Settings->ExportProfilePath), true);
-    Settings->ExportSettingsProfile();
+    IFileManager::Get().MakeDirectory(*FPaths::GetPath(ExportPath), true);
+    TestTrue(TEXT("Export selected destination"), Settings->ExportSettingsProfileToFile(ExportPath));
     FString Export;
-    FFileHelper::LoadFileToString(Export, *Settings->ExportProfilePath);
+    FFileHelper::LoadFileToString(Export, *ExportPath);
     TestFalse(TEXT("Profiles always exclude keys"), Export.Contains(TEXT("not-a-real-secret")));
+    auto* Imported = NewObject<UGPAAEditorSettings>();
+    Imported->bCloudContextAccepted = true;
+    Imported->OpenAIModel = TEXT("different-model");
+    TestTrue(TEXT("Import selected profile"), Imported->ImportSettingsProfileFromFile(ExportPath));
+    TestEqual(TEXT("Model round trip"), Imported->OpenAIModel, Settings->OpenAIModel);
+    TestFalse(TEXT("Import resets cloud consent"), Imported->bCloudContextAccepted);
+    TestTrue(TEXT("Import does not populate a key"), Imported->OpenAIApiKey.IsEmpty());
+    FFileHelper::SaveStringToFile(TEXT("invalid JSON"), *ExportPath);
+    TestFalse(TEXT("Malformed profiles are rejected"), Imported->ImportSettingsProfileFromFile(ExportPath));
+    TestEqual(TEXT("Malformed import preserves settings"), Imported->OpenAIModel, Settings->OpenAIModel);
     return true;
 }
 

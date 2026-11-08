@@ -5,6 +5,9 @@
 #include "DetailCategoryBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IPropertyUtilities.h"
+#include "PropertyHandle.h"
+#include "IDetailPropertyRow.h"
+#include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -21,32 +24,42 @@ void FGPAAEditorSettingsDetails::CustomizeDetails(IDetailLayoutBuilder& Builder)
     const TWeakObjectPtr<UGPAAEditorSettings> Settings(Cast<UGPAAEditorSettings>(Objects[0].Get()));
     if (!Settings.IsValid()) return;
     const TWeakPtr<IPropertyUtilities> Utilities = Builder.GetPropertyUtilities();
-    auto AddAction = [&](const FName Category, const TCHAR* Label, void (UGPAAEditorSettings::*Action)())
+    auto MakeAction = [Settings, Utilities](const TCHAR* Label, void (UGPAAEditorSettings::*Action)())
     {
-        const FText Text = FText::FromString(Label);
-        Builder.EditCategory(Category).AddCustomRow(Text).WholeRowContent()
-        [
-            SNew(SButton)
-            .Text(Text)
+        return SNew(SButton).Text(FText::FromString(Label))
             .OnClicked_Lambda([Settings, Utilities, Action]()
             {
                 if (Settings.IsValid()) (Settings.Get()->*Action)();
                 if (const auto Pinned = Utilities.Pin()) Pinned->RequestRefresh();
                 return FReply::Handled();
-            })
-        ];
+            });
     };
-    AddAction(TEXT("Chat"), TEXT("Save Personal Key"), &UGPAAEditorSettings::SavePersonalKey);
-    AddAction(TEXT("Chat"), TEXT("Remove Personal Key"), &UGPAAEditorSettings::RemovePersonalKey);
-    Builder.EditCategory(TEXT("Chat")).AddCustomRow(FText::FromString(TEXT("Personal key status"))).WholeRowContent()
-    [
-        SNew(STextBlock)
-        .AutoWrapText(true)
-        .Text_Lambda([Settings]() { return FText::FromString(Settings.IsValid() ? Settings->LastDiagnosticsResult : FString()); })
-    ];
-    AddAction(TEXT("Diagnostics"), TEXT("Check Assistant"), &UGPAAEditorSettings::CheckAssistant);
-    AddAction(TEXT("Diagnostics"), TEXT("Test Prompt IA (Billable)"), &UGPAAEditorSettings::TestPromptIA);
-    AddAction(TEXT("Import / Export"), TEXT("Export Settings Profile"), &UGPAAEditorSettings::ExportSettingsProfile);
-    AddAction(TEXT("Import / Export"), TEXT("Import Settings Profile"), &UGPAAEditorSettings::ImportSettingsProfile);
-    AddAction(TEXT("Import / Export"), TEXT("Import Legacy Chat History"), &UGPAAEditorSettings::ImportLegacyChatHistory);
+    const auto Key = Builder.GetProperty(GET_MEMBER_NAME_CHECKED(UGPAAEditorSettings, OpenAIApiKey));
+    Builder.EditCategory(TEXT("Chat")).AddProperty(Key).CustomWidget()
+        .NameContent()[Key->CreatePropertyNameWidget()]
+        .ValueContent().MinDesiredWidth(480).MaxDesiredWidth(1200)
+        [
+            SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1)[Key->CreatePropertyValueWidget()]
+            + SHorizontalBox::Slot().AutoWidth().Padding(6, 0)
+                [MakeAction(TEXT("Save Personal Key"), &UGPAAEditorSettings::SavePersonalKey)]
+            + SHorizontalBox::Slot().AutoWidth()
+                [MakeAction(TEXT("Remove Personal Key"), &UGPAAEditorSettings::RemovePersonalKey)]
+        ];
+    auto AddStatus = [&](const FName Category, FString UGPAAEditorSettings::*Member)
+    {
+        Builder.EditCategory(Category).AddCustomRow(FText::FromString(TEXT("Status")))
+            .Visibility(TAttribute<EVisibility>::CreateLambda([Settings, Member]()
+            { return Settings.IsValid() && !(Settings.Get()->*Member).IsEmpty() ? EVisibility::Visible : EVisibility::Collapsed; }))
+            .WholeRowContent()
+            [SNew(STextBlock).AutoWrapText(true).Text_Lambda([Settings, Member]()
+            { return FText::FromString(Settings.IsValid() ? Settings.Get()->*Member : FString()); })];
+    };
+    AddStatus(TEXT("Chat"), &UGPAAEditorSettings::LastKeyResult);
+    auto& Profiles = Builder.EditCategory(TEXT("Import / Export"));
+    Profiles.AddCustomRow(FText::FromString(TEXT("Export Settings Profile"))).WholeRowContent()
+        [MakeAction(TEXT("Export Settings Profile"), &UGPAAEditorSettings::ExportSettingsProfile)];
+    Profiles.AddCustomRow(FText::FromString(TEXT("Import Settings Profile"))).WholeRowContent()
+        [MakeAction(TEXT("Import Settings Profile"), &UGPAAEditorSettings::ImportSettingsProfile)];
+    AddStatus(TEXT("Import / Export"), &UGPAAEditorSettings::LastProfileResult);
 }

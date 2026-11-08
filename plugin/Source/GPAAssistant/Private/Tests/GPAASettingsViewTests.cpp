@@ -29,6 +29,16 @@ bool ContainsSettingsText(const TSharedRef<SWidget>& Widget, const FString& Text
         if (ContainsSettingsText(Children->GetChildAt(I), Text)) return true;
     return false;
 }
+bool HasCredentialRow(const TSharedRef<SWidget>& Widget)
+{
+    if (Widget->GetTypeAsString() == TEXT("SHorizontalBox") &&
+        ContainsSettingsText(Widget, TEXT("Save Personal Key")) &&
+        ContainsSettingsText(Widget, TEXT("Remove Personal Key")) && Widget->GetChildren()->Num() == 3) return true;
+    FChildren* Children = Widget->GetChildren();
+    for (int32 I = 0; I < Children->Num(); ++I)
+        if (HasCredentialRow(Children->GetChildAt(I))) return true;
+    return false;
+}
 struct FGPAASettingsViewState
 {
     TSharedPtr<IDetailsView> View;
@@ -47,8 +57,14 @@ bool FGPAAWaitForSettingsActions::Update()
     if ((!Save || !Remove) && FPlatformTime::Seconds() < State->Deadline) return false;
     Test->TestTrue(TEXT("Settings view exposes Save Personal Key"), Save);
     Test->TestTrue(TEXT("Settings view exposes Remove Personal Key"), Remove);
+    Test->TestTrue(TEXT("Credential field and both actions share one horizontal row"), HasCredentialRow(State->View.ToSharedRef()));
     Test->TestFalse(TEXT("Personal settings do not force shared default config"),
         UGPAAEditorSettings::StaticClass()->HasAnyClassFlags(CLASS_DefaultConfig));
+    Test->TestTrue(TEXT("Export action remains available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Export Settings Profile")));
+    Test->TestTrue(TEXT("Import action remains available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Import Settings Profile")));
+    for (const TCHAR* Removed : {TEXT("Check Assistant"), TEXT("Test Prompt IA (Billable)"),
+        TEXT("Import Legacy Chat History"), TEXT("Export Profile Path"), TEXT("Import Profile Path"), TEXT("Legacy History Path")})
+        Test->TestFalse(Removed, ContainsSettingsText(State->View.ToSharedRef(), Removed));
     State->Window->RequestDestroyWindow();
     return true;
 }
