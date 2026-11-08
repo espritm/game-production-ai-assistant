@@ -108,6 +108,14 @@ An additional real-editor smoke run opens a fresh host without an assistant pane
 
 CI subsequently reached the tests and exposed an engine window-restoration fatal error when opening a native asset toolkit in the Windows service session. Reference validation remains in the standard suite; native asset-window activation is now an explicit opt-in acceptance test (`test-native-plugin.ps1 -InteractiveAssetEditor`) for an interactive desktop, not silently skipped within a successful test. That activation had already passed locally on UE 5.8.4 and the owner confirmed real animation opening. The offscreen settings/history checks remain in CI. The previous CI attempt failed before compilation on an upstream HTTP 504 downloading ONNX Runtime. Pinned dependency downloads now retry up to three times; the same mandatory hash verification remains in place. Repeated HTTP 504 responses required seeding this runner's tool cache with the already downloaded, lock-file-verified upstream assets. CI now retains that cache outside checkout cleanup via `GPAA_NATIVE_DEPENDENCY_CACHE`; absent or invalid entries still use the pinned download and mandatory hash verification. No live key was read or paid cloud request made during development tests. After the owner closed Unreal, the verified archive was installed in `.gpaa/manual-acceptance/Plugins/GameProductionAIAssistant`; the previous plugin was backed up and installed file hashes were verified. Existing local data and credentials were preserved.
 
+## Prompt layout — 8 November 2026
+
+At the owner's request, the prompt answer frame keeps its full height while its editable/selectable content aligns to the bottom. Long responses retain bounded scrolling and streaming follows the end of the text. The redundant Ask answer and Question labels are removed. The question field starts empty with the hint `Prompt your AI here`, rather than using a prefilled example as its value.
+
+A geometry regression checks the actual arrangement of a short answer at the bottom of a 600×400 frame, full retention and viewport bounds for long answers, absence of the old labels, and an empty prompt with the exact hint. All 19 standard tests pass locally on UE 5.8.4 with no warnings. Evidence: `.gpaa/native-smoke/499c6e4f3be84fe582144d91923c4208/`. Windows archive SHA256: `4A46BB7B4F0E8D59440A0D69C82B5E38B583EBF00E7334B1B682671ED94F9C5F`.
+
+The verified archive was installed into GPAA_Manual while Unreal was closed, with a backup and installed file hash verification. Manual visual acceptance remains pending.
+
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.

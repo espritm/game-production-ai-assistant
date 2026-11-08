@@ -28,6 +28,8 @@ public:
 
 private:
     friend class FGPAAHistoryLayoutTest;
+    friend class FGPAAPromptLayoutTest;
+    void SetAnswerText(const FString& Text);
     TSharedPtr<SWidgetSwitcher> MainViewSwitcher;
     FReply OnCancelClicked();
     void StartNative(bool Ask);
@@ -93,7 +95,6 @@ private:
     TSharedPtr<STextBlock> StatusText;
     TSharedPtr<STextBlock> SettingsSummaryText;
     TSharedPtr<STextBlock> SearchSummaryText;
-    TSharedPtr<STextBlock> AnswerSummaryText;
     TSharedPtr<SMultiLineEditableTextBox> AnswerTextBox;
     TSharedPtr<SMultiLineEditableTextBox> HistoryTextBox;
     TSharedPtr<SListView<TSharedPtr<FGPAASourceReference>>> SearchResultsListView;

@@ -68,7 +68,7 @@ try {
     if ($passed -lt 1 -or $result.failed -ne 0 -or $result.notRun -ne 0 -or @($result.tests | Where-Object { $_.state -ne 'Success' -or $_.errors -gt 0 }).Count -gt 0) {
         throw "Native Unreal tests failed. See $report"
     }
-    foreach ($test in @('GPAA.Native.UI.HistoryExclusiveView','GPAA.Native.Workflow.BackgroundIndexNonPreemptive','GPAA.Native.UI.SettingsCredentialActions','GPAA.Native.Cloud.StreamingBoundaries','GPAA.Native.Cloud.HttpContract.Responses','GPAA.Native.Cloud.HttpContract.ChatCompletions','GPAA.Native.Embeddings.Corpus','GPAA.Native.Storage.AtomicRollbackAndHistory','GPAA.Native.Workflow.OfflineIndexAndSearch')) {
+    foreach ($test in @('GPAA.Native.UI.PromptBottomAlignment','GPAA.Native.UI.HistoryExclusiveView','GPAA.Native.Workflow.BackgroundIndexNonPreemptive','GPAA.Native.UI.SettingsCredentialActions','GPAA.Native.Cloud.StreamingBoundaries','GPAA.Native.Cloud.HttpContract.Responses','GPAA.Native.Cloud.HttpContract.ChatCompletions','GPAA.Native.Embeddings.Corpus','GPAA.Native.Storage.AtomicRollbackAndHistory','GPAA.Native.Workflow.OfflineIndexAndSearch')) {
         if (@($result.tests | Where-Object { $_.fullTestPath -eq $test -and $_.state -eq 'Success' }).Count -ne 1) { throw "Required native test missing: $test" }
     }
     if ($AcceptanceProject -and @($result.tests | Where-Object { $_.fullTestPath -like 'GPAA.Acceptance.ProjectAssets*' -and $_.state -eq 'Success' }).Count -ne 1) { throw 'Real project asset acceptance test missing.' }

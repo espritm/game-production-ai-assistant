@@ -161,14 +161,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         SNew(SVerticalBox)
 
                         + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
-                        [
-                            SAssignNew(AnswerSummaryText, STextBlock)
-                            .Text(LOCTEXT("AnswerLabel", "Ask answer"))
-                        ]
-
-                        + SVerticalBox::Slot()
                         .FillHeight(1.0f)
                         .Padding(0.0f, 0.0f, 0.0f, 10.0f)
                         [
@@ -176,14 +168,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .IsReadOnly(true)
                             .AutoWrapText(true)
                             .Text(LOCTEXT("EmptyAnswer", ""))
-                        ]
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
-                        [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("PromptQuestionLabel", "Question"))
                         ]
 
                         + SVerticalBox::Slot()
@@ -196,7 +180,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .Padding(0.0f, 0.0f, 8.0f, 0.0f)
                             [
                                 SAssignNew(PromptQuestionTextBox, SEditableTextBox)
-                                .Text(LOCTEXT("QuestionPlaceholder", "Where is stamina regeneration handled?"))
+                                .HintText(LOCTEXT("QuestionPlaceholder", "Prompt your AI here"))
                             ]
 
                             + SHorizontalBox::Slot()
@@ -330,6 +314,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
         ]
     ];
 
+    AnswerTextBox->SetVAlign(VAlign_Bottom);
     LoadChatSettings();
 }
 
@@ -429,17 +414,17 @@ void SGPAAssistantWidget::StartNative(bool Ask)
     NativeRequestId = FGuid::NewGuid(); const FGuid RequestId = NativeRequestId;
     TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
     NativeAnswer.Reset(); SetBusy(TEXT("Preparing local project knowledge..."));
-    if (Ask) AnswerTextBox->SetText(FText::GetEmpty());
+    if (Ask) SetAnswerText(TEXT(""));
     FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, false,
         [Weak, RequestId](const FString& Message) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) W->SetBusy(Message); },
-        [Weak, RequestId](const FString& Delta) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) { W->NativeAnswer += Delta; W->AnswerTextBox->SetText(FText::FromString(W->NativeAnswer)); } },
+        [Weak, RequestId](const FString& Delta) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) { W->NativeAnswer += Delta; W->SetAnswerText(W->NativeAnswer); } },
         [Weak, RequestId, Ask](bool Ok, const FString& Message, const FGPAANativeResult& Result)
         {
             auto W = Weak.Pin(); if (!W || W->NativeRequestId != RequestId) return;
             if (Ask)
             {
                 W->SetChatResult(Ok, Message, Result.Answer, Result.Sources);
-                if (!Ok && !Result.Answer.IsEmpty()) W->AnswerTextBox->SetText(FText::FromString(Result.Answer + TEXT("\n\n[Interrupted] ") + Message));
+                if (!Ok && !Result.Answer.IsEmpty()) W->SetAnswerText(Result.Answer + TEXT("\n\n[Interrupted] ") + Message);
             }
             else W->SetSearchResult(Ok, Message, Result.Sources);
         });
@@ -471,7 +456,7 @@ void SGPAAssistantWidget::SetResult(bool bSucceeded, const FString& Message)
 {
     StopBusy();
     StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Done") : TEXT("Error")));
-    AnswerTextBox->SetText(FText::FromString(Message));
+    SetAnswerText(Message);
 }
 
 void SGPAAssistantWidget::SetHistoryResult(bool bSucceeded, const FString& Message)
@@ -503,14 +488,19 @@ void SGPAAssistantWidget::SetSearchResult(bool bSucceeded, const FString& Messag
     RefreshSourceLists();
 }
 
+void SGPAAssistantWidget::SetAnswerText(const FString& Text)
+{
+    AnswerTextBox->SetText(FText::FromString(Text));
+    AnswerTextBox->ScrollTo(ETextLocation::EndOfDocument);
+}
+
 void SGPAAssistantWidget::SetChatResult(bool bSucceeded, const FString& Message, const FString& Answer, const TArray<FGPAASourceReference>& Sources)
 {
     StopBusy();
     StatusText->SetText(FText::FromString(bSucceeded
         ? FString::Printf(TEXT("Answer complete via %s"), *GetSelectedChatProviderName())
         : TEXT("Error")));
-    AnswerSummaryText->SetText(FText::FromString(Message));
-    AnswerTextBox->SetText(FText::FromString(bSucceeded ? Answer : Message));
+    SetAnswerText(bSucceeded ? Answer : Message);
 
     AnswerSources.Reset();
     if (bSucceeded)
