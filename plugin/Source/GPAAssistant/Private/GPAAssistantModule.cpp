@@ -97,7 +97,10 @@ bool FGPAAssistantModule::TickAutomaticKnowledge(float DeltaTime)
     if (Runtime->IsBusy()) return true;
     const FString Root = GetDefault<UGPAAEditorSettings>()->GetResolvedProjectRoot();
     if (Runtime->RefreshIfIdle(Root, FGPAAAssetMetadataRequestBuilder::BuildSyncRequest(Root)))
+    {
+        UE_LOG(LogTemp, Display, TEXT("GPAA automatic index cycle started: clockMs=%lld"), static_cast<int64>(Now * 1000.0));
         NextKnowledgeRefresh = Now + 60.0;
+    }
     return true;
 }
 
