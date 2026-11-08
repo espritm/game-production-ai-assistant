@@ -4,6 +4,7 @@
 #include "Editor.h"
 #include "Curves/CurveFloat.h"
 #include "Subsystems/AssetEditorSubsystem.h"
+#include "Misc/CommandLine.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGPAAAssetReferenceTest, "GPAA.Plugin.SourceOpener.AssetReferences",
@@ -28,6 +29,26 @@ bool FGPAAAssetReferenceTest::RunTest(const FString& Parameters)
     Source.RelativePath = TEXT("asset:C:/Windows/not-an-asset.txt");
     TestFalse(TEXT("Filesystem paths cannot become asset objects"), FGPAASourceOpener::ResolveAssetObjectPath(Source, Path));
     TestTrue(TEXT("Failed resolution clears output"), Path.IsEmpty());
+    return true;
+}
+
+// A toolkit opens a native window and requires an interactive desktop. Keep this
+// explicit so service/headless CI still runs every reference-validation assertion.
+IMPLEMENT_COMPLEX_AUTOMATION_TEST(FGPAAInteractiveAssetEditorTest, "GPAA.Acceptance.AssetEditor",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+void FGPAAInteractiveAssetEditorTest::GetTests(TArray<FString>& Names, TArray<FString>& Commands) const
+{
+    if (FParse::Param(FCommandLine::Get(), TEXT("GPAAInteractiveAssetTest")))
+    {
+        Names.Add(TEXT("Activation"));
+        Commands.Add(TEXT("Activation"));
+    }
+}
+bool FGPAAInteractiveAssetEditorTest::RunTest(const FString& Parameters)
+{
+    FGPAASourceReference Source;
+    Source.SourceType = TEXT("Asset");
+    FString Status;
     // Exercise the real editor dispatcher with a disposable in-memory asset.
     UCurveFloat* Asset = NewObject<UCurveFloat>(GetTransientPackage(), NAME_None, RF_Transient);
     Source.RelativePath = TEXT("asset:") + Asset->GetPathName();

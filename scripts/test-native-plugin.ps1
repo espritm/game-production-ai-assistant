@@ -6,7 +6,8 @@ param(
     [string] $TestFilter = 'GPAA.Native',
     [switch] $EngineInstallation,
     [string] $AcceptanceProject,
-    [string] $WorkspaceRoot
+    [string] $WorkspaceRoot,
+    [switch] $InteractiveAssetEditor
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -55,6 +56,7 @@ $args = @('"' + (Join-Path $projectRoot 'Host.uproject') + '"', '-unattended','-
     '-DDC=GPAASmokeDDC','-NoZenAutoLaunch','-ExecCmds="Automation RunTests ' + $TestFilter + '"','-TestExit="Automation Test Queue Empty"',
     '-ReportExportPath="' + $report + '"','-abslog="' + (Join-Path $run 'Unreal.log') + '"')
 if ($AcceptanceProject) { $args += '-GPAARealAssets' }
+if ($InteractiveAssetEditor) { $args += '-GPAAInteractiveAssetTest' }
 Write-Host "Native smoke evidence: $run"
 $proc = Start-Process $editor -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $run 'stdout.log') -RedirectStandardError (Join-Path $run 'stderr.log')
 $null = $proc.Handle
@@ -70,6 +72,7 @@ try {
         if (@($result.tests | Where-Object { $_.fullTestPath -eq $test -and $_.state -eq 'Success' }).Count -ne 1) { throw "Required native test missing: $test" }
     }
     if ($AcceptanceProject -and @($result.tests | Where-Object { $_.fullTestPath -like 'GPAA.Acceptance.ProjectAssets*' -and $_.state -eq 'Success' }).Count -ne 1) { throw 'Real project asset acceptance test missing.' }
+    if ($InteractiveAssetEditor -and @($result.tests | Where-Object { $_.fullTestPath -eq 'GPAA.Acceptance.AssetEditor.Activation' -and $_.state -eq 'Success' }).Count -ne 1) { throw 'Interactive asset-editor test missing.' }
     $suiteStarted=$false
     foreach ($line in (Get-Content -LiteralPath (Join-Path $run 'Unreal.log'))) {
         if ($line -match 'Test Started\..*Path=\{GPAA\.') {$suiteStarted=$true}
