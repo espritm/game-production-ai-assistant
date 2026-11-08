@@ -12,7 +12,8 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 foreach ($directory in @('Source','Config')) { Copy-Item -LiteralPath (Join-Path $root "plugin\$directory") -Destination $stage -Recurse }
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'Resources'),(Join-Path $stage 'Content'),(Join-Path $stage 'Docs') | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
-foreach ($doc in @('native-user-guide.md','native-third-party-notices.md')) { Copy-Item -LiteralPath (Join-Path $root "docs\$doc") -Destination (Join-Path $stage 'Docs') }
+Copy-Item -LiteralPath (Join-Path $root 'plugin\Resources\Icon128.png') -Destination (Join-Path $stage 'Resources')
+foreach ($doc in @('native-user-guide.md','native-user-guide.txt','native-third-party-notices.md','native-release-notes.md')) { Copy-Item -LiteralPath (Join-Path $root "docs\$doc") -Destination (Join-Path $stage 'Docs') }
 $descriptor=Get-Content (Join-Path $root 'plugin\GameProductionAIAssistant.uplugin') -Raw | ConvertFrom-Json
 $descriptor.EngineVersion="$engine.0"
 $descriptor | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $stage 'GameProductionAIAssistant.uplugin') -Encoding UTF8

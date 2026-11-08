@@ -15,7 +15,7 @@ foreach ($file in $files) {
         if ((Get-Content -LiteralPath $file.FullName -TotalCount 1) -notmatch '^// Copyright .+ 2026\.') { throw "Missing publisher copyright: $relative" }
     }
 }
-$required=@('GameProductionAIAssistant.uplugin','Source/GPAACore/GPAACore.Build.cs','Source/GPAAInference/GPAAInference.Build.cs','Source/GPAAssistant/GPAAssistant.Build.cs',
+$required=@('Resources/Icon128.png','Docs/native-user-guide.txt','Docs/native-release-notes.md','GameProductionAIAssistant.uplugin','Source/GPAACore/GPAACore.Build.cs','Source/GPAAInference/GPAAInference.Build.cs','Source/GPAAssistant/GPAAssistant.Build.cs',
     'Source/ThirdParty/OnnxRuntime/Win64/gpaa_onnxruntime.dll','Source/ThirdParty/OnnxRuntime/LICENSE','Source/ThirdParty/OnnxRuntime/ThirdPartyNotices.txt',
     'Source/ThirdParty/MiniLM/model.onnx','Source/ThirdParty/MiniLM/vocab.txt','Source/ThirdParty/MiniLM/LICENSE','Docs/native-user-guide.md','Docs/native-third-party-notices.md')
 if (-not $FabSource) { $required+=@('Binaries/Win64/UnrealEditor-GPAACore.dll','Binaries/Win64/UnrealEditor-GPAAInference.dll','Binaries/Win64/UnrealEditor-GPAAssistant.dll') }

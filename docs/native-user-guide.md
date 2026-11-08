@@ -1,52 +1,74 @@
-# Native Game Production AI Assistant
+# Game Production AI Assistant — User Guide
 
-Publisher: Maxime ESPRIT. Support: contact@maximeesprit.fr. The plugin is free; cloud API usage is billed separately by your provider.
+Version 0.2.0 (beta). Publisher: Maxime ESPRIT. Support: contact@maximeesprit.fr.
 
-This editor-only Windows plugin indexes your project and searches it locally. Its native mode does not require .NET, Ollama, Python or a companion application. The small CPU embedding model is included in the package. Chat generation uses your own cloud provider account; local chat generation is a later delivery.
+A free Windows x64 editor plugin for local project search and optional cloud AI chat. The search model is included. No companion application, separate model download, .NET service or Ollama installation is required. Cloud API usage is charged separately by your provider.
 
-## First use
+## Compatibility and installation
 
-1. Install the package for your validated Unreal version and enable **Game Production AI Assistant**.
-2. Open **Tools > Game Production AI Assistant**, then **Settings**.
-3. Choose `OpenAI` for the Responses API, or `OpenAICompatible` for a provider supporting streaming Chat Completions.
-4. Set the provider base URL and a model available to your account. The OpenAI base URL is `https://api.openai.com/v1`. Avoid appending `/responses` or `/chat/completions`; the plugin supplies the route.
-5. Enter your personal API key and click **Save Personal Key** in the **Chat** category of Settings. The field is cleared and a confirmation appears after the key is stored in Windows Credential Manager. Each provider URL has a separate credential entry. Use **Remove Personal Key** to delete it. Entering a key in the field alone does not save it.
-6. Review **Cloud Context Consent**: enabling it allows your questions and the selected source excerpts to be sent to the configured provider. That provider bills API usage; the plugin does not supply credits. Its retention policies still apply. The OpenAI adapter requests `store=false`.
-7. Use **Search** or **Send**. Local indexing starts automatically after the project's assets are registered, refreshes every minute, and refreshes changed files before each search or question. Search and indexing work without a key or internet access.
+Validated engine versions: Unreal Engine 5.6.1 and 5.8.4 on Windows x64. Use the package matching your engine version. macOS, Linux and other engine versions are not advertised as supported in this release. This is an editor tool, not a packaged-game runtime feature.
 
-There is no manual refresh button or Project Knowledge status box. Automatic indexing continues while the assistant panel is closed. A periodic refresh waits while another assistant operation is busy; a user search or question takes priority over a background refresh. Background indexing does not clear displayed results or send a cloud request.
+From Fab / Epic Games Launcher: install the plugin for the supported engine version, open your project, enable **Game Production AI Assistant** under **Edit > Plugins**, and restart if requested.
 
-Responses appear progressively. **Cancel** appears beside **Send** or **Search** only while that action is cancellable. It stops the request; partial chat responses are retained in history as interrupted. Search results include source references and the existing source-opening options. Unreal asset metadata is a virtual source, not deep Blueprint graph analysis.
+Manual binary ZIP: close Unreal, extract the matching `Win64.zip` into `<Project>/Plugins/GameProductionAIAssistant/`. The `.uplugin`, `Binaries`, `Source`, `Resources` and other folders must be directly inside that directory. Avoid an extra nested plugin folder. Reopen the project and enable the plugin. The `FabSource.zip` is the source submission archive, not the precompiled installation ZIP.
 
-**History** opens a separate view containing prompts and completed searches, including the selected search scope, result count and references. Empty-result searches are included. Automatic refreshes and internal retrieval for a prompt are not added as separate searches. Search history starts with this plugin update; earlier searches were not recorded. Existing conversations are retained by the history-schema migration. Use **Back** to return to the selected search/chat tab with its content preserved.
+Keep a single active copy: choose either a project or an engine installation for normal use. Update only while Unreal is closed, with a backup of your project. Opening a matching precompiled package should not require compiling the plugin yourself.
 
-Click **Open** on an asset result to open that object in its Unreal asset editor. Code results use your configured external source editor. If an asset has been moved or deleted, refresh knowledge and search again; an unresolved reference is reported as a failure.
+Open **Tools > Game Production AI Assistant**. The panel has **Prompt IA**, **Search**, **History** and **Settings**.
 
-## Local data
+## Local search
 
-The index and recent history are stored under `<YourProject>/Saved/GPAA/native-v1.sqlite`. Models and the inference runtime are read from the installed plugin; the plugin never writes index data into its installation directory. The SQLite database uses transactions and versioned embedding identities. A changed embedding pipeline rebuilds vectors instead of mixing incompatible indexes.
+Indexing starts automatically after Unreal finishes discovering assets, refreshes before each question or search, and runs every minute while idle. The first index can take longer. The panel does not need to remain open for periodic indexing.
 
-The baseline embedding model is the English `sentence-transformers/all-MiniLM-L6-v2`, pinned to the revision described in `native-third-party-notices.md`. English code search is the initial validation target; French and other languages require a larger quality evaluation before equivalent quality can be claimed. It is not a model that generates chat responses.
+Select **Search**, choose **Asset**, **Code**, or **Asset and Code**, enter a query, and click **Search**. Start with an English query such as `pistol reload animation` or a question about a system in your own C++ source. Search is local and does not require a key or internet connection.
 
-Current bounded indexing limits are 10000 source documents, 100000 fragments and 512 KiB per source file. Generated directories, the assistant plugin itself and third-party source folders are excluded. Asset metadata capture currently inherits the existing Asset Registry bounds. Large-project quality and performance require additional validation beyond the bundled prototype corpus.
+**Open** on an asset result opens that object in its Unreal editor. **Open** on a source result uses the configured source editor. Install/configure your preferred editor separately if you want source navigation. For moved or removed assets, rerun the search after saving changes; indexing refreshes automatically.
 
-## Migration from the .NET edition
+The plugin searches source files and Asset Registry metadata. It does not inspect every Blueprint graph or infer the full behavior of binary assets. The included English-oriented embedding model can produce weaker results in other languages. Inspect the results; retrieval does not guarantee finding every relevant file.
 
-The native index is separate from the previous JSON index. It is built automatically when the project opens or before the first search/question. Do not copy embeddings between different models.
+## Cloud chat setup
 
-Use **Export Settings Profile** to select a destination JSON file in the native save dialog. Use **Import Settings Profile** to select an existing JSON profile. Cancelling either dialog leaves settings and files unchanged. Import resets cloud consent so you can review the selected provider before enabling it again. Profiles exclude API keys and do not import keys or history. The legacy history import is no longer exposed in Settings.
+1. Open **Settings** and select a Chat Provider. `OpenAI` uses Responses; `OpenAICompatible` uses streaming Chat Completions.
+2. Set the provider base URL and a model available to your account. For OpenAI, the base URL is `https://api.openai.com/v1`. The plugin appends the API route.
+3. Paste your personal API key into the masked field and click **Save Personal Key** beside it. Entering a key alone does not save it. On success, the input clears and a confirmation appears.
+4. Review and enable **Cloud Context Accepted** if you agree to send your question and selected project excerpts to that provider. Provider charges and data policies apply.
+5. Return to **Prompt IA**, enter your question in **Prompt your AI here**, and click **Send**. Responses appear progressively. Inspect referenced files and assets to verify the answer.
 
-The original backend projects remain in the development repository as a reference. The native plugin has no legacy backend client, supervisor, executable or runtime toggle.
+**Cancel** appears beside **Send** or **Search** while the action is cancellable. An interrupted response can remain in history. Cancellation cannot undo data already sent or guarantee that a provider will not charge for work already performed.
 
-## Validation and compatibility
+Local search is independent of cloud chat. This release does not generate answers with a local language model. Compatible endpoints can differ in supported parameters and streaming behavior.
 
-Build and test the native package using:
+## History and settings profiles
 
-```powershell
-.\scripts\package-native-plugin.ps1 -UnrealEngineRoot 'C:\Program Files\Epic Games\UE_5.6'
-.\scripts\test-native-plugin.ps1 -PackagePath '.gpaa\releases\GameProductionAIAssistant-native-v0.2.0-UE5.6-Win64.zip'
-```
+**History** shows prompts and completed searches, including search scope and references. Empty-result searches are recorded; automatic indexing is not. **Back** returns to the selected view. History persists between editor sessions.
 
-Dependency download is a build-time activity only, pinned by revision and SHA256 in `scripts/native-dependencies.lock.json`. It is not performed on the end user's machine.
+**Export Settings Profile** opens a native save dialog for a JSON file. **Import Settings Profile** opens a native file picker. Cancel either dialog to leave settings and files unchanged. Profiles contain provider/model and source-opening preferences, exclude keys and history, and reset cloud consent when imported. Files over 1 MiB or malformed JSON are rejected. There are no editable path fields or legacy-history import button.
 
-The native smoke tests cover offline embeddings, stream fragmentation, SQLite rollback and local indexing/retrieval. They use no real cloud credentials. Live provider authentication, account quota and model availability must be checked with the user's account. A successful test on one Unreal version does not validate another. Consult the delivery status document for current evidence and outstanding Fab requirements.
+Source Opener **Auto** uses the available source-navigation integration. A custom command supports `{file}` and `{line}` placeholders. **Project Root Override** is an advanced option: leave it empty to index the current project.
+
+## Privacy and storage
+
+The local index and history are stored under `<Project>/Saved/GPAA/native-v1.sqlite`. This can contain project excerpts and chat content; include it in your own data-handling and backup decisions. The bundled model and inference library are read from the plugin installation.
+
+Personal keys are stored as Windows generic credentials for the current Windows user on this PC. The entry is `GPAA/Provider/<hash of normalized provider URL>`. Projects using the same provider URL under that Windows account share the same stored key. Keys are not serialized into Unreal configuration or exported profiles. The plugin reads the key into memory to authenticate requests. Other software with access to that Windows account may also access its credentials.
+
+Use **Remove Personal Key** to remove the credential for the currently configured provider URL. Removing the plugin folder alone does not remove that Windows credential or the local index/history. Close Unreal before manually removing `<Project>/Saved/GPAA` if you choose to clear local data. Back it up first if you want to retain it.
+
+Cloud requests go to your configured endpoint and contain your question and selected source excerpts. The plugin supplies no account or API credits. Review your provider's privacy and retention terms before sending project content. Do not paste secrets into prompts. OpenAI requests set `store=false`; this does not replace applicable provider policies.
+
+## Troubleshooting
+
+- **A key is requested despite filling the field:** click **Save Personal Key** and check the confirmation. Check the base URL; credentials are scoped to that URL.
+- **Authentication, quota or model error:** check the provider account's API access, billing and model availability. Never send a real key to support.
+- **No expected result:** check the scope and project root, save source/assets, then rerun the search. Prefer an English query or exact name/path. Binary asset contents are not fully analyzed.
+- **An asset does not open:** it may have moved or been removed. Search again and check its object path in the Content Browser.
+- **Source navigation does not open:** check the editor installation and Source Opener setting. Asset navigation uses Unreal's editors.
+- **No import/export window:** use an interactive editor session. Native dialogs are unavailable in unattended/headless sessions.
+- **Slow first index:** allow model loading and indexing to finish. Current bounds are 10,000 documents, 100,000 passages and 512 KiB per source file. No large-project performance guarantee is advertised.
+- **A different engine asks to rebuild:** use the package for a supported engine version. A successful build on one version does not validate another.
+
+For support, email **contact@maximeesprit.fr** with the plugin version, exact Unreal version, Windows version and reproduction steps. Redact API keys, personal data and private source from logs/screenshots before sending them.
+
+## Included software
+
+ONNX Runtime 1.20.1 (MIT) and a pinned all-MiniLM-L6-v2 model/vocabulary (Apache-2.0) are bundled. Full attribution and upstream notices are included in `Docs/native-third-party-notices.md` and `Source/ThirdParty`. SQLiteCore and ICU come from Unreal Engine. No demo project or animation asset is included.

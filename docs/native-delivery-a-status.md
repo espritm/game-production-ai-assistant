@@ -1,6 +1,6 @@
 # Native delivery A — implementation and release evidence
 
-Updated: 7 November 2026. Development branch: `codex/native-delivery-a`.
+Updated: 8 November 2026. Development branch: `codex/native-delivery-a`.
 
 ## Implemented baseline
 
@@ -144,18 +144,21 @@ All 24 standard tests pass locally on UE 5.8.4. A separate isolated-process shut
 
 CI includes the isolated shutdown acceptance process via `test-native-plugin.ps1 -HttpShutdownAcceptance`, in addition to the standard suite and automatic-index smoke. The deployment procedure backs up the closed manual project's local GPAA data before the history migration as well as retaining a plugin backup. Installation and manual acceptance depend on the editor being closed.
 
-## Settings layout and profile dialogs � 8 November 2026
+## Settings layout and profile dialogs � 8 November 2026
 
 Personal-key actions now share the masked API-key field row. Diagnostics, legacy-history import and the three manual path fields are removed from Settings. Export opens a native save dialog; import opens a native JSON file picker. Cancelling leaves settings and files unchanged. Profile serialization still excludes secrets and import resets cloud consent. The last selected folder is remembered for the session.
 
 UE 5.8.4 compilation and all 24 standard tests pass. The real Details view test checks the shared credential row and removed controls; profile tests cover a selected-path round trip, secret exclusion, consent reset and malformed input. Evidence: `.gpaa/native-smoke/973cbb61d3b4440aa2f8804835494fa4/`. Windows ZIP SHA256: `3AC7BB45D592F77235346E50DE6C4214D59AFF9954C1D542A8258EAC720914AC`. Native file-dialog interaction remains a manual check.
 
+## Fab dossier and owner acceptance — 8 November 2026
+
+The owner confirmed completion of manual UI acceptance, independent Windows-machine installation and representative real C++ project retrieval. These are user-attested results; second-machine and production-project logs were not provided in this conversation. macOS is explicitly deferred. The final local dossier contains the source/binary archives, English guide, listing copy, third-party declaration and original branding/gallery media. See fab-submission-readiness.md for scope and the remaining portal fields.
+
 ## Remaining release gates
 
-1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.
-2. Test the exact precompiled archive on a clean user environment without .NET/Ollama. Project-plugin and engine-plugin installation tests now pass on the developer machine; that machine still has development tooling installed.
-3. Extend the small real-asset evaluation below to representative game C++ source and more queries. The initial embedding model is English; equivalent French-query quality is not claimed.
-4. Complete the Fab publisher profile, product ID/`FabURL`, third-party software declaration, listing media and user-facing compatibility claims. Validate current Fab requirements before submitting. The source ZIP has a plugin parent folder and excludes Unreal build binaries; it is a review candidate, not an approved store artifact.
+1. Owner preview of the assembled dossier and proposed media.
+2. Actual Fab draft creation, store license selection, public hosting if requested, and assigned product ID/FabURL. Rebuild with the real FabURL once assigned.
+3. Fab source build and review, then a separately authorized publication. No portal upload, submission or publication has been performed.
 
 ## Build and test
 

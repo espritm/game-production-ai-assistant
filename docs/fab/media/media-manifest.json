@@ -1,0 +1,30 @@
+{
+  "images": [
+    {
+      "file": "01-cover.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 96833
+    },
+    {
+      "file": "02-in-editor.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 208741
+    },
+    {
+      "file": "03-local-and-cloud.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 78117
+    }
+  ],
+  "source": "Original GPAA branding; real Unreal capture for 02-in-editor only",
+  "captureCrop": [
+    650,
+    100,
+    1427,
+    998
+  ],
+  "generativeAIImages": false
+}
