@@ -45,8 +45,17 @@ try {
             $secondCount=[int]$events[1].Groups[1].Value
             if($secondCount -ne $firstCount+1 -or [int]$events[1].Groups[2].Value -lt 1){throw 'Periodic refresh did not index the newly added file.'}
             $elapsed=([DateTime]::UtcNow-$firstObserved).TotalSeconds
-            if($elapsed -lt 40){throw 'Periodic refresh fired too early for a one-minute schedule.'}
+            # The first cold model load can take tens of seconds. Measure job
+            # starts (their SQLite connection opens), not completion intervals.
+            $starts=[regex]::Matches($text,'(?m)^\[([^\]]+)\].*LogSQLiteDatabase: Opened database.*native-v1\.sqlite')
+            if($starts.Count -lt 2){throw 'Index start timestamps are missing from the engine log.'}
+            $culture=[Globalization.CultureInfo]::InvariantCulture
+            $firstStart=[DateTime]::ParseExact($starts[0].Groups[1].Value,'yyyy.MM.dd-HH.mm.ss:fff',$culture)
+            $secondStart=[DateTime]::ParseExact($starts[1].Groups[1].Value,'yyyy.MM.dd-HH.mm.ss:fff',$culture)
+            $cadence=($secondStart-$firstStart).TotalSeconds
+            if($cadence -lt 59){throw 'Periodic refresh fired too early for a one-minute schedule.'}
             @{passed=$true;startupFiles=$firstCount;periodicFiles=$secondCount;secondsAfterFirstObservation=$elapsed;
+                secondsBetweenIndexStarts=$cadence;
                 panelOpened=$false;questionSent=$false;archiveSHA256=(Get-FileHash -LiteralPath $PackagePath).Hash} |
                 ConvertTo-Json | Set-Content (Join-Path $run 'result.json') -Encoding UTF8
             Write-Host "PASS startup refresh without a panel and one-minute refresh after source modification. Evidence: $run"
