@@ -86,7 +86,15 @@ The owner confirmed indexing and retrieval in the prepared real-asset host, then
 
 A regression test covers native/legacy path resolution, malformed references and actual editor activation/closure with a transient curve asset. All 15 standard tests pass locally on UE 5.8.4 with zero warnings. Evidence: `.gpaa/native-smoke/1b2d3a39982f42b593240644b1e7bdbf/`. Windows archive SHA256: `E9D72B31B82F7F32FE7569CDE9B3ECFCFA2747B8CD09DBA3D742ADFA1562799D`.
 
-After the owner closed Unreal, this archive was installed into the existing manual host `.gpaa/native-smoke/6d44a8acea324893a9bc6a2c7a23d5ea/Host/Plugins/GameProductionAIAssistant`, with installed file hashes checked against the package and the previous plugin backed up under `.gpaa/manual-plugin-backups`. The original project and engine installation were not modified. Manual confirmation that the pistol animation opens remains pending. Earlier transfer kits refer to the older validated archives and must be regenerated for final distribution.
+After the owner closed Unreal, this archive was installed into the existing manual host `.gpaa/native-smoke/6d44a8acea324893a9bc6a2c7a23d5ea/Host/Plugins/GameProductionAIAssistant`, with installed file hashes checked against the package and the previous plugin backed up under `.gpaa/manual-plugin-backups`. The original project and engine installation were not modified. The owner subsequently confirmed that the animation is found and opens correctly in Unreal in the distinctly named GPAA_Manual project, and that retrieval persists after restarting the editor. Earlier transfer kits refer to the older validated archives and must be regenerated for final distribution.
+
+## Manual acceptance fix — personal key actions in Settings
+
+On 8 November 2026 the owner reported that Ask could not find a saved key despite a populated password field. The Settings screenshot showed no Save Personal Key action. `CallInEditor` functions alone were not displayed in the developer-settings view. An explicitly registered detail customization now provides save/remove key, diagnostic and profile/history actions, with a visible status message. Personal non-secret preferences use user configuration instead of forcing the shared default config; the password field remains transient and is never serialized. Cloud consent remains an explicit user choice.
+
+The new offscreen PropertyEditor regression constructs the actual Settings detail view, generates its virtualized rows and verifies that both credential buttons exist. All 16 standard tests pass on UE 5.8.4 with zero warnings, without paid cloud requests. Evidence: `.gpaa/native-smoke/060d8cde7a63405eb1a399113e72b0a3/`. Windows ZIP SHA256: `E6DE4395F159201E88CA64211501325526C4CD61059A2FEC62ADA91751B62974`.
+
+After the owner closed Unreal, this package was installed in `.gpaa/manual-acceptance/Plugins/GameProductionAIAssistant`, with a backup under `.gpaa/manual-plugin-backups` and installed file hashes verified. Manual credential saving and cloud generation are pending owner retest. No real key was accessed by the development tools.
 
 ## Remaining release gates
 

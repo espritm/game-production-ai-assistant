@@ -10,7 +10,7 @@ This editor-only Windows plugin indexes your project and searches it locally. It
 2. Open **Tools > Game Production AI Assistant**, then **Settings**.
 3. Choose `OpenAI` for the Responses API, or `OpenAICompatible` for a provider supporting streaming Chat Completions.
 4. Set the provider base URL and a model available to your account. The OpenAI base URL is `https://api.openai.com/v1`. Avoid appending `/responses` or `/chat/completions`; the plugin supplies the route.
-5. Enter your personal API key and click **Save Personal Key**. The field is cleared after the key is stored in Windows Credential Manager. Each provider URL has a separate credential entry. Use **Remove Personal Key** to delete it.
+5. Enter your personal API key and click **Save Personal Key** in the **Chat** category of Settings. The field is cleared and a confirmation appears after the key is stored in Windows Credential Manager. Each provider URL has a separate credential entry. Use **Remove Personal Key** to delete it. Entering a key in the field alone does not save it.
 6. Review **Cloud Context Consent**: enabling it allows your questions and the selected source excerpts to be sent to the configured provider. That provider bills API usage; the plugin does not supply credits. Its retention policies still apply. The OpenAI adapter requests `store=false`.
 7. Use **Test Prompt IA** if desired. This is a real, potentially billable request to your selected provider.
 8. Select **Refresh Knowledge**, then **Search** or **Ask**. Search and indexing work without a key or internet access. Ask refreshes changed files before retrieving context.

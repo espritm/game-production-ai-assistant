@@ -28,6 +28,7 @@ public class GPAAssistant : ModuleRules
             "Json",
             "JsonUtilities",
             "Projects",
+            "PropertyEditor",
             "Settings",
             "Slate",
             "SlateCore",

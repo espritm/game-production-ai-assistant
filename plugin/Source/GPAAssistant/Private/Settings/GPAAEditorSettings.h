@@ -7,7 +7,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #include "Models/GPAAApiModels.h"
 #include "GPAAEditorSettings.generated.h"
 
-UCLASS(Config = EditorPerProjectUserSettings, DefaultConfig, DisplayName = "Game Production AI Assistant")
+UCLASS(Config = EditorPerProjectUserSettings, DisplayName = "Game Production AI Assistant")
 class UGPAAEditorSettings final : public UDeveloperSettings
 {
     GENERATED_BODY()
