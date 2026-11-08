@@ -33,7 +33,7 @@ Current bounded indexing limits are 10000 source documents, 100000 fragments and
 
 ## Migration from the .NET edition
 
-The native index is separate from the previous JSON index. Rebuild it with **Refresh Knowledge**. Do not copy embeddings between different models.
+The native index is separate from the previous JSON index. It is built automatically when the project opens or before the first search/question. Do not copy embeddings between different models.
 
 To import a previous `chat-history.json`, set **Legacy History Path**, then click **Import Legacy Chat History**. This is an explicit history import; it does not import API keys or vectors. Repeated imports add entries again. Portable profiles never include or import API keys in the native edition. Old configurations containing a plaintext key should be cleaned up by their owner; saving a new native key does not silently modify arbitrary older config files.
 
