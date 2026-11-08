@@ -462,6 +462,8 @@ bool FGPAANativeWorkflowTest::RunTest(const FString &Parameters)
             State->Result = Result;
             State->Done = true;
         });
+    TestFalse(TEXT("Periodic refresh cannot preempt a foreground search"),
+        FGPAANativeRuntime::Get()->RefreshIfIdle(Root, TEXT("")));
     ADD_LATENT_AUTOMATION_COMMAND(FGPAAWaitForNativeWorkflow(State, FPlatformTime::Seconds() + 60, this));
     return true;
 }

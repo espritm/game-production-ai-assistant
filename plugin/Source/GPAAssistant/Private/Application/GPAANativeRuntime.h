@@ -25,9 +25,12 @@ class FGPAANativeRuntime : public TSharedFromThis<FGPAANativeRuntime, ESPMode::T
     void ImportHistory(const FString &ProjectRoot, const FString &JsonPath,
                        TFunction<void(bool, const FString &)> OnFinished);
     void Cancel();
+    bool IsBusy() const;
+    bool RefreshIfIdle(const FString& ProjectRoot, const FString& AssetSnapshot);
     static FString DatabasePath(const FString &ProjectRoot);
 
   private:
+    bool bRunning = false;
     FGPAATaskPtr CurrentTask;
     TArray<TFuture<void>> Jobs;
     FCriticalSection IndexMutex;

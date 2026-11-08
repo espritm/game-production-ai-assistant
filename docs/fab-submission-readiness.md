@@ -9,7 +9,7 @@ This is a release preparation record, not an approval or a submitted listing.
 - Local real-asset evaluation on a copy of the owner's project; English-oriented retrieval with weaker French results.
 - Separate Windows binary ZIP and source ZIP, fixed dependency hashes and bundled third-party notices.
 - The source ZIP has one plugin parent directory. Standard Config, Content, Resources and Source directories are preserved, including empty directories. The plugin has no Unreal content assets and keeps `CanContainContent=false`.
-- Independent-machine acceptance kit: archive hash verification and a portable standard 14-test run. The kit itself has passed after extraction on the developer machine; actual independent-machine acceptance remains pending.
+- Independent-machine acceptance kit: archive hash verification and a portable standard native test run. The kit itself has passed after extraction on the developer machine; actual independent-machine acceptance remains pending.
 
 The developer session cannot manage local Hyper-V machines (Windows authorization denied). No fresh VM or second machine has been tested. This is an operating-system access limitation, not a test success.
 

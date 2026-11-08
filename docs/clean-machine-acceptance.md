@@ -16,7 +16,7 @@ Transfer the generated kit ZIP under `.gpaa/acceptance-kits` to a second Windows
 powershell -NoProfile -ExecutionPolicy Bypass -File .\run-clean-machine-acceptance.ps1 -UnrealEngineRoot 'C:\Program Files\Epic Games\UE_5.8' -RequireCleanBaseline
 ```
 
-The script checks the plugin archive hash, records tool availability, installs the plugin into a fresh disposable host project and runs its 14 standard Unreal tests. It uses the bundled embedding model and simulated loopback HTTP providers. Nothing is downloaded and no real provider is contacted by the tests. Successful tests also verify that installed plugin files remain unchanged.
+The script checks the plugin archive hash, records tool availability, installs the plugin into a fresh disposable host project and runs its standard Unreal test suite. It uses the bundled embedding model and simulated loopback HTTP providers. Nothing is downloaded and no real provider is contacted by the tests. Successful tests also verify that installed plugin files remain unchanged.
 
 `-RequireCleanBaseline` rejects a .NET or Ollama command on PATH; this is an additional check, not proof of a clean machine. The script deliberately never automatically marks `cleanMachineAttested` true. Record the actual OS image provenance and observations below. Python availability is informational; it is not invoked by the tests.
 
@@ -24,7 +24,7 @@ The script checks the plugin archive hash, records tool availability, installs t
 
 - Record Windows version, Unreal version, fresh image or second-PC provenance, test date and tester.
 - Open the generated `Host.uproject`, then open the assistant panel. Use the project path printed in the smoke evidence, or locate it under the extracted kit's `.gpaa/native-smoke` folder.
-- With internet disconnected, refresh knowledge and search for the stamina fixture. Verify source references open and the panel remains responsive. Leave networking enabled for localhost; the automated HTTP fixtures require loopback access.
+- With internet disconnected, search for the stamina fixture. Indexing refreshes automatically. Verify source references open and the panel remains responsive. Leave networking enabled for localhost; the automated HTTP fixtures require loopback access.
 - Restart the editor; check that the index can be reused and the panel opens without requesting a companion installation.
 - Confirm that no user API key was needed, no provider key was bundled, and no separate program installation was requested.
 - Do not treat a successful automated run on a developer machine as independent-machine acceptance.

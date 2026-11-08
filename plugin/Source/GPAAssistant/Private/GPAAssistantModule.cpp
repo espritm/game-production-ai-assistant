@@ -11,6 +11,10 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 #include "Settings/GPAAEditorSettings.h"
 #include "Settings/GPAAEditorSettingsDetails.h"
 #include "PropertyEditorModule.h"
+#include "Editor.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Services/GPAAAssetMetadataRequestBuilder.h"
+#include "Misc/CommandLine.h"
 #include "UI/SGPAAssistantWidget.h"
 #include "Application/GPAANativeRuntime.h"
 
@@ -23,6 +27,10 @@ namespace
 
 void FGPAAssistantModule::StartupModule()
 {
+    // Automation owns the runtime explicitly; do not add unrelated jobs to its fixtures.
+    if (!IsRunningCommandlet() && !FString(FCommandLine::Get()).Contains(TEXT("Automation RunTests")))
+        AutomaticKnowledgeTicker = FTSTicker::GetCoreTicker().AddTicker(
+            FTickerDelegate::CreateRaw(this, &FGPAAssistantModule::TickAutomaticKnowledge), 1.0f);
     auto& PropertyEditor = FModuleManager::LoadModuleChecked<FPropertyEditorModule>(TEXT("PropertyEditor"));
     PropertyEditor.RegisterCustomClassLayout(UGPAAEditorSettings::StaticClass()->GetFName(),
         FOnGetDetailCustomizationInstance::CreateStatic(&FGPAAEditorSettingsDetails::MakeInstance));
@@ -51,6 +59,8 @@ void FGPAAssistantModule::StartupModule()
 
 void FGPAAssistantModule::ShutdownModule()
 {
+    bStopping = true;
+    FTSTicker::GetCoreTicker().RemoveTicker(AutomaticKnowledgeTicker);
     FGPAANativeRuntime::Shutdown();
     if (auto* PropertyEditor = FModuleManager::GetModulePtr<FPropertyEditorModule>(TEXT("PropertyEditor")))
         PropertyEditor->UnregisterCustomClassLayout(UGPAAEditorSettings::StaticClass()->GetFName());
@@ -71,7 +81,24 @@ void FGPAAssistantModule::ShutdownModule()
 
 void FGPAAssistantModule::HandleEnginePreExit()
 {
+    bStopping = true;
+    FTSTicker::GetCoreTicker().RemoveTicker(AutomaticKnowledgeTicker);
     FGPAANativeRuntime::Shutdown();
+}
+
+bool FGPAAssistantModule::TickAutomaticKnowledge(float DeltaTime)
+{
+    if (bStopping) return false;
+    const double Now = FPlatformTime::Seconds();
+    if (!GEditor || Now < NextKnowledgeRefresh) return true;
+    auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+    if (Registry.Get().IsLoadingAssets()) return true;
+    auto Runtime = FGPAANativeRuntime::Get();
+    if (Runtime->IsBusy()) return true;
+    const FString Root = GetDefault<UGPAAEditorSettings>()->GetResolvedProjectRoot();
+    if (Runtime->RefreshIfIdle(Root, FGPAAAssetMetadataRequestBuilder::BuildSyncRequest(Root)))
+        NextKnowledgeRefresh = Now + 60.0;
+    return true;
 }
 
 void FGPAAssistantModule::RegisterMenus()

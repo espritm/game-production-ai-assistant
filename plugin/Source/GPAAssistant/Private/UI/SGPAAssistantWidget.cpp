@@ -63,9 +63,10 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
         SNew(SBorder)
         .Padding(12.0f)
         [
-            SNew(SOverlay)
+            SAssignNew(MainViewSwitcher, SWidgetSwitcher)
+            .WidgetIndex(0)
 
-            + SOverlay::Slot()
+            + SWidgetSwitcher::Slot()
             [
                 SNew(SVerticalBox)
 
@@ -107,42 +108,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         [
                             SNew(SButton).Text(LOCTEXT("CancelNative", "Cancel"))
                             .OnClicked(this, &SGPAAssistantWidget::OnCancelClicked)
-                        ]
-                    ]
-                ]
-
-                + SVerticalBox::Slot()
-                .AutoHeight()
-                .Padding(0.0f, 0.0f, 0.0f, 8.0f)
-                [
-                    SNew(SButton)
-                    .Text(LOCTEXT("RefreshKnowledgeButton", "Refresh Knowledge"))
-                    .OnClicked(this, &SGPAAssistantWidget::OnRefreshKnowledgeClicked)
-                ]
-
-                + SVerticalBox::Slot()
-                .AutoHeight()
-                .Padding(0.0f, 0.0f, 0.0f, 10.0f)
-                [
-                    SNew(SBorder)
-                    .Padding(8.0f)
-                    [
-                        SNew(SVerticalBox)
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
-                        [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("ProjectKnowledgeLabel", "Project Knowledge"))
-                        ]
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        [
-                            SAssignNew(KnowledgeText, STextBlock)
-                            .Text(LOCTEXT("ProjectKnowledgeEmpty", "No local knowledge status loaded."))
-                            .AutoWrapText(true)
                         ]
                     ]
                 ]
@@ -322,12 +287,9 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                 ]
             ]
 
-            + SOverlay::Slot()
-            .HAlign(HAlign_Fill)
-            .VAlign(VAlign_Fill)
+            + SWidgetSwitcher::Slot()
             [
                 SNew(SBorder)
-                .Visibility(this, &SGPAAssistantWidget::GetHistoryVisibility)
                 .Padding(12.0f)
                 [
                     SNew(SVerticalBox)
@@ -350,7 +312,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         .AutoWidth()
                         [
                             SNew(SButton)
-                            .Text(LOCTEXT("CloseHistoryButton", "X"))
+                            .Text(LOCTEXT("CloseHistoryButton", "Back"))
                             .OnClicked(this, &SGPAAssistantWidget::OnCloseHistoryClicked)
                         ]
                     ]
@@ -369,7 +331,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
     ];
 
     LoadChatSettings();
-    LoadKnowledgeStatus();
 }
 
 FReply SGPAAssistantWidget::OnOpenSettingsClicked()
@@ -400,14 +361,9 @@ FReply SGPAAssistantWidget::OnSaveChatSettingsClicked()
     return FReply::Handled();
 }
 
-FReply SGPAAssistantWidget::OnRefreshKnowledgeClicked()
-{
-    StartNative(false, true); return FReply::Handled();
-}
-
 FReply SGPAAssistantWidget::OnHistoryClicked()
 {
-    bHistoryVisible = true; SetBusy(TEXT("Loading local history..."));
+    MainViewSwitcher->SetActiveWidgetIndex(1); SetBusy(TEXT("Loading local history..."));
     TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
     FGPAANativeRuntime::Get()->LoadHistory(GetProjectRoot(), [Weak](bool Ok, const FString& Message)
     { if (auto Widget = Weak.Pin()) Widget->SetHistoryResult(Ok, Message); });
@@ -416,7 +372,7 @@ FReply SGPAAssistantWidget::OnHistoryClicked()
 
 FReply SGPAAssistantWidget::OnCloseHistoryClicked()
 {
-    bHistoryVisible = false;
+    MainViewSwitcher->SetActiveWidgetIndex(0);
     return FReply::Handled();
 }
 
@@ -444,17 +400,17 @@ FReply SGPAAssistantWidget::OnSearchTabClicked()
 
 FReply SGPAAssistantWidget::OnSearchClicked()
 {
-    StartNative(false, false); return FReply::Handled();
+    StartNative(false); return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnAskClicked()
 {
-    StartNative(true, false); return FReply::Handled();
+    StartNative(true); return FReply::Handled();
 }
 
 SGPAAssistantWidget::~SGPAAssistantWidget()
 {
-    FGPAANativeRuntime::CancelIfRunning();
+    if (bBusy) FGPAANativeRuntime::CancelIfRunning();
 }
 
 FReply SGPAAssistantWidget::OnCancelClicked()
@@ -465,24 +421,22 @@ FReply SGPAAssistantWidget::OnCancelClicked()
     return FReply::Handled();
 }
 
-void SGPAAssistantWidget::StartNative(bool Ask, bool RefreshOnly)
+void SGPAAssistantWidget::StartNative(bool Ask)
 {
     LoadPluginSettings();
     const FString Query = Ask ? GetPromptQuestion() : GetSearchQuery();
-    if (!RefreshOnly && Query.TrimStartAndEnd().IsEmpty()) { SetResult(false, TEXT("Enter a question or search query first.")); return; }
+    if (Query.TrimStartAndEnd().IsEmpty()) { SetResult(false, TEXT("Enter a question or search query first.")); return; }
     NativeRequestId = FGuid::NewGuid(); const FGuid RequestId = NativeRequestId;
     TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
     NativeAnswer.Reset(); SetBusy(TEXT("Preparing local project knowledge..."));
     if (Ask) AnswerTextBox->SetText(FText::GetEmpty());
-    FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, RefreshOnly,
+    FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, false,
         [Weak, RequestId](const FString& Message) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) W->SetBusy(Message); },
         [Weak, RequestId](const FString& Delta) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) { W->NativeAnswer += Delta; W->AnswerTextBox->SetText(FText::FromString(W->NativeAnswer)); } },
-        [Weak, RequestId, Ask, RefreshOnly](bool Ok, const FString& Message, const FGPAANativeResult& Result)
+        [Weak, RequestId, Ask](bool Ok, const FString& Message, const FGPAANativeResult& Result)
         {
             auto W = Weak.Pin(); if (!W || W->NativeRequestId != RequestId) return;
-            W->UpdateKnowledgeSummary(Result.Statistics);
-            if (RefreshOnly) W->SetResult(Ok, Message);
-            else if (Ask)
+            if (Ask)
             {
                 W->SetChatResult(Ok, Message, Result.Answer, Result.Sources);
                 if (!Ok && !Result.Answer.IsEmpty()) W->AnswerTextBox->SetText(FText::FromString(Result.Answer + TEXT("\n\n[Interrupted] ") + Message));
@@ -767,56 +721,6 @@ void SGPAAssistantWidget::ApplyChatSettingsResponse(bool bSucceeded, const FStri
     }
 }
 
-void SGPAAssistantWidget::LoadKnowledgeStatus()
-{
-    KnowledgeText->SetText(FText::FromString(TEXT("First use: Settings > choose provider and model > Save Personal Key > Cloud Context Consent. Then Refresh Knowledge and Ask. API usage is billed by your provider. Search works offline.")));
-}
-
-void SGPAAssistantWidget::ApplyKnowledgeStatusResponse(bool bSucceeded, const FString& Message)
-{
-    if (!KnowledgeText.IsValid())
-    {
-        return;
-    }
-
-    if (!bSucceeded)
-    {
-        KnowledgeText->SetText(FText::FromString(TEXT("Project knowledge status unavailable.")));
-        return;
-    }
-
-    FGPAAKnowledgeStatus Status;
-    if (!FGPAAApiModels::ParseKnowledgeStatus(Message, Status))
-    {
-        KnowledgeText->SetText(FText::FromString(TEXT("Invalid project knowledge response.")));
-        return;
-    }
-
-    KnowledgeText->SetText(FText::FromString(FGPAAKnowledgePresenter::FormatKnowledgeStatus(Status)));
-}
-
-void SGPAAssistantWidget::UpdateKnowledgeSummaryFromIndexResponse(const FString& Message)
-{
-    if (!KnowledgeText.IsValid())
-    {
-        return;
-    }
-
-    FGPAAIndexStatistics Statistics;
-    if (FGPAAApiModels::ParseIndexStatisticsResponse(Message, Statistics))
-    {
-        UpdateKnowledgeSummary(Statistics);
-    }
-}
-
-void SGPAAssistantWidget::UpdateKnowledgeSummary(const FGPAAIndexStatistics& Statistics)
-{
-    if (KnowledgeText.IsValid())
-    {
-        KnowledgeText->SetText(FText::FromString(FGPAAKnowledgePresenter::FormatIndexSummary(Statistics)));
-    }
-}
-
 FGPAAChatSettings SGPAAssistantWidget::GetChatSettingsFromUi() const
 {
     return GetDefault<UGPAAEditorSettings>()->ToChatSettings();
@@ -898,11 +802,6 @@ FText SGPAAssistantWidget::GetSettingsSummaryText() const
 {
     const auto* Settings=GetDefault<UGPAAEditorSettings>();
     return FText::FromString(FString::Printf(TEXT("Provider: %s | Model: %s | Search: local"),*Settings->ChatProvider,*Settings->OpenAIModel));
-}
-
-EVisibility SGPAAssistantWidget::GetHistoryVisibility() const
-{
-    return bHistoryVisible ? EVisibility::Visible : EVisibility::Collapsed;
 }
 
 EVisibility SGPAAssistantWidget::GetCustomSourceOpenerVisibility() const

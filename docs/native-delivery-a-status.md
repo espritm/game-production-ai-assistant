@@ -96,6 +96,18 @@ The new offscreen PropertyEditor regression constructs the actual Settings detai
 
 After the owner closed Unreal, this package was installed in `.gpaa/manual-acceptance/Plugins/GameProductionAIAssistant`, with a backup under `.gpaa/manual-plugin-backups` and installed file hashes verified. Manual credential saving and cloud generation are pending owner retest. No real key was accessed by the development tools.
 
+## Automatic indexing and exclusive history view — 8 November 2026
+
+The owner confirmed cloud answers grounded in the correct real-asset project and local conversation history retained after restarting Unreal. At the owner's request, the History overlay is replaced by an exclusive panel view with Back navigation. Main search/chat state is preserved; the two views cannot overlap. The manual Refresh Knowledge button and Project Knowledge box have been removed.
+
+An editor-module ticker refreshes the local index once the initial Asset Registry scan is ready, then every minute. It runs without the assistant panel. Each search/question also refreshes changed files as before. Periodic work checks the shared runtime's complete busy state, including cloud response/history persistence, and defers rather than cancelling foreground work. Foreground requests retain priority and can cancel an in-progress background index. Closing the editor removes the ticker before shutting down the runtime. Background indexing updates neither the displayed answer nor the search results and makes no provider request.
+
+All 18 standard tests pass locally on UE 5.8.4, with no warnings and unchanged installed plugin files. New coverage checks History/Back state preservation, removed UI controls and background indexing without a panel, including non-preemption of an active search. Evidence: `.gpaa/native-smoke/e5a00eb3710b4f3298effb13d768320b/`.
+
+An additional real-editor smoke run opens a fresh host without an assistant panel or automation commands. It observes initial indexing, adds one source file, and verifies that the next automatic cycle picks it up. This passed: 3 initial files, 4 files after the next cycle, 58.41 seconds after observing the first completion. Evidence: `.gpaa/automatic-index-smoke/53252e74b80b4e01aaedb3c80c1a4cf9/result.json`. The periodic deadline is 60 seconds after starting the preceding refresh; observation happens after that refresh completes. This smoke is included in Unreal CI. Windows archive SHA256: `7FF059F83AA637B4C98BC713C9C6045929F7E5734785BB04DFE59D65AA17FB98`.
+
+The previous CI attempt failed before compilation on an upstream HTTP 504 downloading ONNX Runtime. Pinned dependency downloads now retry up to three times; the same mandatory hash verification remains in place. No live key was read or paid cloud request made during development tests. After the owner closed Unreal, the verified archive was installed in `.gpaa/manual-acceptance/Plugins/GameProductionAIAssistant`; the previous plugin was backed up and installed file hashes were verified. Existing local data and credentials were preserved.
+
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.

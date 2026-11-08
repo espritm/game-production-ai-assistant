@@ -21,7 +21,7 @@ Search your Unreal project locally and ask a cloud AI assistant questions ground
 
 Game Production AI Assistant brings project search and source-aware chat into the Unreal Editor. Install the Windows plugin, enable it, and index your project. The embedding model ships with the plugin, so local search works without a companion application or a separate model installation.
 
-Search source files and Asset Registry metadata, follow references back to your project, and refresh the index as files change. The plugin stores its index and conversation history in the project's Saved directory.
+Search source files and Asset Registry metadata and follow references back to your project. Indexing refreshes automatically on project opening, before each search or question, and every minute while idle. The plugin stores its index and conversation history in the project's Saved directory.
 
 For generated answers, connect your own OpenAI API account or a compatible Chat Completions endpoint. Cloud generation requires a personal API key and explicit permission to send retrieved project excerpts. Provider charges are billed separately by your provider. Local search does not require a cloud API key.
 
@@ -59,7 +59,7 @@ Local indexing and search run inside Unreal. The index and history live under `<
 ## Demonstration capture plan
 
 1. Enable the plugin in a fresh project and open the assistant panel.
-2. Index a representative project; show completion and a local query with navigable source references.
+2. Open a representative project and show a local query with navigable source references; indexing refreshes automatically.
 3. Show provider configuration with a blank key field and explicit cloud consent.
 4. Capture an optional cloud answer only after the account owner authorizes a billable request; show source references and streaming cancellation.
 5. Show history and explain that local search works without a cloud account.

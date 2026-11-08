@@ -27,14 +27,15 @@ public:
     virtual ~SGPAAssistantWidget() override;
 
 private:
+    friend class FGPAAHistoryLayoutTest;
+    TSharedPtr<SWidgetSwitcher> MainViewSwitcher;
     FReply OnCancelClicked();
-    void StartNative(bool Ask, bool RefreshOnly);
+    void StartNative(bool Ask);
     FGuid NativeRequestId;
     FString NativeAnswer;
     FReply OnOpenSettingsClicked();
     FReply OnLoadChatSettingsClicked();
     FReply OnSaveChatSettingsClicked();
-    FReply OnRefreshKnowledgeClicked();
     FReply OnHistoryClicked();
     FReply OnCloseHistoryClicked();
     FReply OnPromptTabClicked();
@@ -57,10 +58,6 @@ private:
     void LoadChatSettings();
     void SaveChatSettings();
     void ApplyChatSettingsResponse(bool bSucceeded, const FString& Message);
-    void LoadKnowledgeStatus();
-    void ApplyKnowledgeStatusResponse(bool bSucceeded, const FString& Message);
-    void UpdateKnowledgeSummaryFromIndexResponse(const FString& Message);
-    void UpdateKnowledgeSummary(const FGPAAIndexStatistics& Statistics);
     FGPAAChatSettings GetChatSettingsFromUi() const;
     void OnSourceOpenerModeChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
     void OnChatProviderChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
@@ -73,7 +70,6 @@ private:
     FText GetSelectedChatProviderText() const;
     FText GetSelectedSearchResultFilterText() const;
     FText GetSettingsSummaryText() const;
-    EVisibility GetHistoryVisibility() const;
     EVisibility GetCustomSourceOpenerVisibility() const;
     EVisibility GetOpenAICompatibleSettingsVisibility() const;
     FString GetProjectRoot() const;
@@ -96,7 +92,6 @@ private:
     TSharedPtr<SWidgetSwitcher> TabSwitcher;
     TSharedPtr<STextBlock> StatusText;
     TSharedPtr<STextBlock> SettingsSummaryText;
-    TSharedPtr<STextBlock> KnowledgeText;
     TSharedPtr<STextBlock> SearchSummaryText;
     TSharedPtr<STextBlock> AnswerSummaryText;
     TSharedPtr<SMultiLineEditableTextBox> AnswerTextBox;
@@ -113,7 +108,6 @@ private:
     int32 BusyFrame = 0;
     int32 ActiveTabIndex = 0;
     bool bBusy = false;
-    bool bHistoryVisible = false;
     TArray<TSharedPtr<FGPAASourceReference>> SearchResults;
     TArray<TSharedPtr<FGPAASourceReference>> FilteredSearchResults;
     TArray<TSharedPtr<FGPAASourceReference>> AnswerSources;

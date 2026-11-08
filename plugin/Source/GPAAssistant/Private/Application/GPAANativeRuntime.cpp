@@ -184,11 +184,37 @@ void FGPAANativeRuntime::StoreHistory(bool Complete, TFunction<void(const FStrin
 }
 void FGPAANativeRuntime::Cancel()
 {
+    bRunning = false;
     if (CurrentTask)
         CurrentTask->Cancelled.Store(true);
     if (Cloud)
         Cloud->Cancel();
     StoreHistory(false);
+}
+bool FGPAANativeRuntime::IsBusy() const
+{
+    if (bRunning) return true;
+    for (const auto& Job : Jobs) if (!Job.IsReady()) return true;
+    return false;
+}
+bool FGPAANativeRuntime::RefreshIfIdle(const FString& ProjectRoot, const FString& AssetSnapshot)
+{
+    if (IsBusy()) return false;
+    Run(ProjectRoot, AssetSnapshot, TEXT(""), false, true,
+        [](const FString&) {}, [](const FString&) {},
+        [](bool Ok, const FString& Message, const FGPAANativeResult& Result)
+        {
+            if (!Ok)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("GPAA automatic index refresh failed: %s"), *Message);
+            }
+            else
+            {
+                UE_LOG(LogTemp, Display, TEXT("GPAA automatic index ready: files=%d changed=%d reused=%d"),
+                    Result.Statistics.FilesIndexed, Result.Statistics.FilesChanged, Result.Statistics.FilesReused);
+            }
+        });
+    return true;
 }
 void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSnapshot, const FString &Query, bool Ask,
                              bool RefreshOnly, TFunction<void(const FString &)> OnStatus,
@@ -201,6 +227,14 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
     auto Task = CurrentTask;
     auto Self = AsShared();
     TWeakPtr<FGPAANativeRuntime, ESPMode::ThreadSafe> Weak = Self;
+    bRunning = true;
+    auto Completion = MoveTemp(OnFinished);
+    OnFinished = [Weak, Task, Completion](bool Ok, const FString& Message, const FGPAANativeResult& Result)
+    {
+        if (auto Live = Weak.Pin())
+            if (Live->CurrentTask == Task) Live->bRunning = false;
+        Completion(Ok, Message, Result);
+    };
     FGPAAChatRequest ChatRequest;
     if (Ask)
     {

@@ -13,8 +13,15 @@ foreach ($asset in $manifest.assets) {
     if (-not (Test-Path -LiteralPath $download) -or
         ($asset.sha256 -and (Get-FileHash -LiteralPath $download).Hash -ine $asset.sha256)) {
         Write-Host "Downloading pinned dependency $($asset.name)..."
-        $client = New-Object Net.WebClient
-        try { $client.DownloadFile($asset.url, "$download.partial") } finally { $client.Dispose() }
+        for ($attempt=1; $attempt -le 3; $attempt++) {
+            $client = New-Object Net.WebClient
+            try { $client.DownloadFile($asset.url, "$download.partial"); break }
+            catch {
+                if ($attempt -eq 3) {throw}
+                Write-Host "Pinned download failed; retrying attempt $($attempt+1)/3."
+                Start-Sleep -Seconds (2*$attempt)
+            } finally { $client.Dispose() }
+        }
         Move-Item -LiteralPath "$download.partial" -Destination $download -Force
     }
     $hash = (Get-FileHash -LiteralPath $download -Algorithm SHA256).Hash.ToLowerInvariant()

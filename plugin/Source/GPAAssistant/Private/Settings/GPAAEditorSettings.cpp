@@ -23,7 +23,7 @@ FString UGPAAEditorSettings::GetResolvedProjectRoot() const
 }
 void UGPAAEditorSettings::CheckAssistant()
 {
-    LastDiagnosticsResult = TEXT("The assistant runs in Unreal. Refresh Knowledge validates local indexing. No "
+    LastDiagnosticsResult = TEXT("The assistant runs in Unreal. Local indexing refreshes automatically on project opening, every minute and before each search or question. No "
                                  "companion application is required.");
 }
 void UGPAAEditorSettings::SavePersonalKey()

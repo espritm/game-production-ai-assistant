@@ -84,6 +84,15 @@ jobs:
             -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip" `
             -TestFilter GPAA
 
+      - name: Verify automatic startup and minute refresh without a panel
+        working-directory: ${{ env.GPAA_BUILD_ROOT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content plugin/GameProductionAIAssistant.uplugin -Raw | ConvertFrom-Json).VersionName
+          & .\scripts\test-automatic-index.ps1 `
+            -UnrealEngineRoot $env:GPAA_ENGINE_ROOT `
+            -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip"
+
       - name: Test native distribution policy
         working-directory: ${{ env.GPAA_BUILD_ROOT }}
         run: |
@@ -103,7 +112,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gpaa-native-smoke-ue-${{ env.GPAA_ENGINE_VERSION }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ github.workspace }}/.gpaa/native-smoke
+          path: |
+            ${{ github.workspace }}/.gpaa/native-smoke
+            ${{ github.workspace }}/.gpaa/automatic-index-smoke
           if-no-files-found: ignore
           retention-days: 7
 
