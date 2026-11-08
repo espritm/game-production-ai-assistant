@@ -72,6 +72,7 @@ jobs:
         working-directory: ${{ env.GPAA_BUILD_ROOT }}
         run: |
           $ErrorActionPreference = 'Stop'
+          $env:GPAA_NATIVE_DEPENDENCY_CACHE = Join-Path $env:RUNNER_TOOL_CACHE 'gpaa-native-dependencies'
           & .\scripts\package-native-plugin.ps1 -UnrealEngineRoot $env:GPAA_ENGINE_ROOT
 
       - name: Install exact release archive and run Unreal smoke test

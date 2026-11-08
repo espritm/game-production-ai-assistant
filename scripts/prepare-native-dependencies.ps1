@@ -6,6 +6,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $manifestPath = Join-Path $PSScriptRoot 'native-dependencies.lock.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $cache = Join-Path $root '.gpaa\dependencies'
+if ($env:GPAA_NATIVE_DEPENDENCY_CACHE) { $cache=$env:GPAA_NATIVE_DEPENDENCY_CACHE }
 New-Item -ItemType Directory -Force -Path $cache | Out-Null
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 foreach ($asset in $manifest.assets) {
