@@ -124,6 +124,14 @@ New regression coverage checks control order, an empty search field and exact hi
 
 After the owner closed Unreal, the verified package was installed into GPAA_Manual with a backup and file hash verification. Manual visual acceptance remains pending.
 
+## Native segmented view selector — 8 November 2026
+
+Prompt IA and Search now use a native single-selection SSegmentedControl in place of independent action buttons. The selected segment follows the same active-view state as the content switcher. Both views remain clickable, and switching or returning from History preserves prompt text, search text and the current answer. Prompt remains the default view.
+
+The view-selector regression checks the two native segments, view/selection state, content preservation, History Back and rejection of invalid indices. All 22 standard tests pass locally on UE 5.8.4 with no warnings. Evidence: `.gpaa/native-smoke/70326b67079f4817ba0dbea08f8bf773/`. Windows archive SHA256: `CFF7EABC1DC012EA33FF8E32CD7BBE1A105C11A3429D3293C2DDBC5BD605232B`.
+
+After the owner closed Unreal, the verified archive was installed into GPAA_Manual with a backup and installed file hash verification. Manual visual acceptance remains pending.
+
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.

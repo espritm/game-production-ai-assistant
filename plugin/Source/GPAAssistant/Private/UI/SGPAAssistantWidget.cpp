@@ -7,6 +7,7 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #include "Editor.h"
 #include "ISettingsModule.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SSegmentedControl.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Styling/AppStyle.h"
 #include "Widgets/Input/SComboBox.h"
@@ -121,23 +122,18 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                 + SVerticalBox::Slot()
                 .AutoHeight()
                 [
-                    SNew(SHorizontalBox)
-
-                    + SHorizontalBox::Slot()
-                    .AutoWidth()
-                    .Padding(0.0f, 0.0f, 8.0f, 0.0f)
+                    SNew(SBox)
+                    .HAlign(HAlign_Left)
                     [
-                        SNew(SButton)
+                        SAssignNew(ViewSelector, SSegmentedControl<int32>)
+                        .Value_Lambda([this]() { return ActiveTabIndex; })
+                        .SupportsMultiSelection(false)
+                        .SupportsEmptySelection(false)
+                        .OnValueChanged(this, &SGPAAssistantWidget::OnViewSelectionChanged)
+                        + SSegmentedControl<int32>::Slot(0)
                         .Text(LOCTEXT("PromptTabButton", "Prompt IA"))
-                        .OnClicked(this, &SGPAAssistantWidget::OnPromptTabClicked)
-                    ]
-
-                    + SHorizontalBox::Slot()
-                    .AutoWidth()
-                    [
-                        SNew(SButton)
+                        + SSegmentedControl<int32>::Slot(1)
                         .Text(LOCTEXT("SearchTabButton", "Search"))
-                        .OnClicked(this, &SGPAAssistantWidget::OnSearchTabClicked)
                     ]
                 ]
 
@@ -343,25 +339,22 @@ FReply SGPAAssistantWidget::OnCloseHistoryClicked()
     return FReply::Handled();
 }
 
+void SGPAAssistantWidget::OnViewSelectionChanged(int32 Index)
+{
+    if (Index != 0 && Index != 1) return;
+    ActiveTabIndex = Index;
+    if (TabSwitcher.IsValid()) TabSwitcher->SetActiveWidgetIndex(Index);
+}
+
 FReply SGPAAssistantWidget::OnPromptTabClicked()
 {
-    ActiveTabIndex = 0;
-    if (TabSwitcher.IsValid())
-    {
-        TabSwitcher->SetActiveWidgetIndex(ActiveTabIndex);
-    }
-
+    OnViewSelectionChanged(0);
     return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnSearchTabClicked()
 {
-    ActiveTabIndex = 1;
-    if (TabSwitcher.IsValid())
-    {
-        TabSwitcher->SetActiveWidgetIndex(ActiveTabIndex);
-    }
-
+    OnViewSelectionChanged(1);
     return FReply::Handled();
 }
 

@@ -17,6 +17,7 @@ class STextBlock;
 class SWidgetSwitcher;
 enum class ECheckBoxState : uint8;
 class ITableRow;
+template<typename OptionType> class SSegmentedControl;
 
 class SGPAAssistantWidget final : public SCompoundWidget
 {
@@ -31,6 +32,9 @@ private:
     friend class FGPAAHistoryLayoutTest;
     friend class FGPAAPromptLayoutTest;
     friend class FGPAASearchLayoutTest;
+    friend class FGPAAViewSelectorTest;
+    void OnViewSelectionChanged(int32 Index);
+    TSharedPtr<SSegmentedControl<int32>> ViewSelector;
     void SetAnswerText(const FString& Text);
     TSharedPtr<SWidgetSwitcher> MainViewSwitcher;
     FReply OnCancelClicked();
