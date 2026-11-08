@@ -298,6 +298,18 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
                                      });
                 if (Ok && !RefreshOnly)
                     Ok = FGPAACore::Search(Query, SearchScope, 8, *Self->Embeddings, Store, Task, Sources, Error);
+                if (Ok && !Ask && !RefreshOnly && !Task->Cancelled.Load())
+                {
+                    TArray<TSharedPtr<FJsonValue>> References;
+                    for (const auto& Source : Sources)
+                        References.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("%s:%d-%d (score %.3f)"),
+                            *Source.Path, Source.FirstLine, Source.LastLine, Source.Score)));
+                    FString Json, StorageError;
+                    FJsonSerializer::Serialize(References, TJsonWriterFactory<>::Create(&Json));
+                    if (!Store.AddHistory(Query, FString::Printf(TEXT("%d result(s)."), Sources.Num()), true,
+                            StorageError, Json, TEXT("Search"), SearchScope))
+                        Error = TEXT("Search complete, but local history could not be saved: ") + StorageError;
+                }
                 if (Ok && Ask)
                 {
                     int32 Characters = 0, Keep = 0;
@@ -326,7 +338,7 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
                         return;
                     if (!Ok || !Ask || RefreshOnly)
                     {
-                        OnFinished(Ok, Ok ? TEXT("Local project knowledge is ready.") : Error, Result);
+                        OnFinished(Ok, Ok && Error.IsEmpty() ? TEXT("Local project knowledge is ready.") : Error, Result);
                         return;
                     }
                     Pinned->ChatQuestion = Query;

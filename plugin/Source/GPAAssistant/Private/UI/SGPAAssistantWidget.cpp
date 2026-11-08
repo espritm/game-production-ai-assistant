@@ -103,11 +103,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .Text(LOCTEXT("OpenSettingsButton", "Settings"))
                             .OnClicked(this, &SGPAAssistantWidget::OnOpenSettingsClicked)
                         ]
-                        + SHorizontalBox::Slot().AutoWidth().Padding(8,0,0,0)
-                        [
-                            SNew(SButton).Text(LOCTEXT("CancelNative", "Cancel"))
-                            .OnClicked(this, &SGPAAssistantWidget::OnCancelClicked)
-                        ]
+
                     ]
                 ]
 
@@ -181,8 +177,15 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .AutoWidth()
                             [
                                 SNew(SButton)
-                                .Text(LOCTEXT("AskButton", "Ask"))
+                                .Text(LOCTEXT("SendButton", "Send"))
                                 .OnClicked(this, &SGPAAssistantWidget::OnAskClicked)
+                            ]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(8,0,0,0)
+                            [
+                                SAssignNew(PromptCancelButton, SButton)
+                                .Text(LOCTEXT("CancelRequestButton", "Cancel"))
+                                .Visibility(this, &SGPAAssistantWidget::GetRequestCancelVisibility, true)
+                                .OnClicked(this, &SGPAAssistantWidget::OnCancelClicked)
                             ]
                         ]
                     ]
@@ -226,6 +229,13 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                                 SNew(SButton)
                                 .Text(LOCTEXT("SearchButton", "Search"))
                                 .OnClicked(this, &SGPAAssistantWidget::OnSearchClicked)
+                            ]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(8,0,0,0)
+                            [
+                                SAssignNew(SearchCancelButton, SButton)
+                                .Text(LOCTEXT("CancelRequestButton", "Cancel"))
+                                .Visibility(this, &SGPAAssistantWidget::GetRequestCancelVisibility, false)
+                                .OnClicked(this, &SGPAAssistantWidget::OnCancelClicked)
                             ]
                         ]
 
@@ -326,7 +336,8 @@ FReply SGPAAssistantWidget::OnSaveChatSettingsClicked()
 
 FReply SGPAAssistantWidget::OnHistoryClicked()
 {
-    MainViewSwitcher->SetActiveWidgetIndex(1); SetBusy(TEXT("Loading local history..."));
+    MainViewSwitcher->SetActiveWidgetIndex(1);
+    HistoryTextBox->SetText(FText::FromString(TEXT("Loading local history...")));
     TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
     FGPAANativeRuntime::Get()->LoadHistory(GetProjectRoot(), [Weak](bool Ok, const FString& Message)
     { if (auto Widget = Weak.Pin()) Widget->SetHistoryResult(Ok, Message); });
@@ -375,8 +386,9 @@ SGPAAssistantWidget::~SGPAAssistantWidget()
 
 FReply SGPAAssistantWidget::OnCancelClicked()
 {
+    if (!bCancellable) return FReply::Handled();
     NativeRequestId = FGuid::NewGuid();
-    FGPAANativeRuntime::Get()->Cancel(); StopBusy();
+    FGPAANativeRuntime::CancelIfRunning(); StopBusy();
     StatusText->SetText(FText::FromString(TEXT("Operation cancelled. Any partial response is kept in local history.")));
     return FReply::Handled();
 }
@@ -388,6 +400,8 @@ void SGPAAssistantWidget::StartNative(bool Ask)
     if (Query.TrimStartAndEnd().IsEmpty()) { SetResult(false, TEXT("Enter a question or search query first.")); return; }
     NativeRequestId = FGuid::NewGuid(); const FGuid RequestId = NativeRequestId;
     TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
+    bCancellable = true;
+    bRequestIsAsk = Ask;
     NativeAnswer.Reset(); SetBusy(TEXT("Preparing local project knowledge..."));
     if (Ask) SetAnswerText(TEXT(""));
     FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, false,
@@ -436,8 +450,7 @@ void SGPAAssistantWidget::SetResult(bool bSucceeded, const FString& Message)
 
 void SGPAAssistantWidget::SetHistoryResult(bool bSucceeded, const FString& Message)
 {
-    StopBusy();
-    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("History loaded") : TEXT("Error")));
+    if (!bCancellable) StatusText->SetText(FText::FromString(bSucceeded ? TEXT("History loaded") : TEXT("Error")));
     if (HistoryTextBox.IsValid())
     {
         HistoryTextBox->SetText(FText::FromString(Message));
@@ -502,9 +515,15 @@ EActiveTimerReturnType SGPAAssistantWidget::HandleBusyTick(double InCurrentTime,
     return EActiveTimerReturnType::Continue;
 }
 
+EVisibility SGPAAssistantWidget::GetRequestCancelVisibility(bool ForAsk) const
+{
+    return bCancellable && bBusy && bRequestIsAsk == ForAsk ? EVisibility::Visible : EVisibility::Collapsed;
+}
+
 void SGPAAssistantWidget::StopBusy()
 {
     bBusy = false;
+    bCancellable = false;
 }
 
 TSharedRef<ITableRow> SGPAAssistantWidget::GenerateSourceRow(TSharedPtr<FGPAASourceReference> Item, const TSharedRef<STableViewBase>& OwnerTable)

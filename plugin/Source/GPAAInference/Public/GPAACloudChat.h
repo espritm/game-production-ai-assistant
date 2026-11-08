@@ -24,6 +24,7 @@ class GPAAINFERENCE_API FGPAACloudChat final : public IGPAAChatProvider,
 {
   public:
     static void ShutdownRequests();
+    static void InitializeRequests();
     virtual ~FGPAACloudChat() override;
     virtual void Start(const FGPAAChatRequest &Request, FGPAATextEvent OnText, FGPAAChatFinished OnFinished) override;
     virtual void Cancel() override;

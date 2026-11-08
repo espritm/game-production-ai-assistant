@@ -85,6 +85,16 @@ jobs:
             -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip" `
             -TestFilter GPAA
 
+      - name: Verify pending HTTP shutdown and late-request rejection
+        working-directory: ${{ env.GPAA_BUILD_ROOT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content plugin/GameProductionAIAssistant.uplugin -Raw | ConvertFrom-Json).VersionName
+          & .\scripts\test-native-plugin.ps1 `
+            -UnrealEngineRoot $env:GPAA_ENGINE_ROOT `
+            -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip" `
+            -HttpShutdownAcceptance
+
       - name: Verify automatic startup and minute refresh without a panel
         working-directory: ${{ env.GPAA_BUILD_ROOT }}
         run: |

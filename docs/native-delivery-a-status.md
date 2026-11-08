@@ -132,6 +132,18 @@ The view-selector regression checks the two native segments, view/selection stat
 
 After the owner closed Unreal, the verified archive was installed into GPAA_Manual with a backup and installed file hash verification. Manual visual acceptance remains pending.
 
+## Contextual cancellation, mixed history and HTTP teardown — 8 November 2026
+
+Cancel is removed from the header. A Cancel action appears beside Send (renamed from Ask) or Search only while the corresponding foreground request is cancellable. History loading and automatic indexing do not expose cancellation. Reading history no longer clears the foreground request's busy/cancellable state.
+
+Completed searches now persist their query, scope, result count and references before reporting completion. Search events and prompts appear together in History. Zero-result searches are included; automatic refreshes and prompt-internal retrieval are excluded. Search history begins with this update; earlier unrecorded searches cannot be reconstructed. A transactional schema-2-to-3 history migration retains previous prompts and leaves embedding/index identities unchanged.
+
+The owner reported an exit assertion from FHttpModule::Get after HTTP shutdown. Inference cleanup now runs on OnEnginePreExit, cancels owned tasks, releases owner request references and delegates while HTTP is alive, flushes pending transport and drains queued callbacks. Cleanup is idempotent and uses only an already-loaded HTTP module; late provider starts are rejected. Owners are pinned while releasing callbacks to handle callback-only ownership safely. No FHttpModule::Get call remains in the inference implementation.
+
+All 24 standard tests pass locally on UE 5.8.4. A separate isolated-process shutdown acceptance test also passes: a loopback request completes, another remains pending, cleanup cancels it, a callback-only owner is released, repeated cleanup is safe, late starts are rejected, and the editor process exits normally with no late callback. Evidence: `.gpaa/native-smoke/877971fded894f2dbeb5cee078d9b83f/` (standard) and `.gpaa/native-smoke/58962bd7431041cc8f0271639c7dab5d/` (shutdown). Windows ZIP SHA256: `802B9A2702F100CF867C98D349B4581BE56B334ABBC4741C4F3BEEA27EE7F011`.
+
+CI includes the isolated shutdown acceptance process via `test-native-plugin.ps1 -HttpShutdownAcceptance`, in addition to the standard suite and automatic-index smoke. The deployment procedure backs up the closed manual project's local GPAA data before the history migration as well as retaining a plugin backup. Installation and manual acceptance depend on the editor being closed.
+
 ## Remaining release gates
 
 1. UE 5.8.4 source compilation, archive installation and all 14 Unreal tests now pass locally. To repeat this validation in CI, configure the corresponding `ue-5.8` runner label and optionally `UE_5_8_ROOT`; the workflow supports selecting 5.8 manually.

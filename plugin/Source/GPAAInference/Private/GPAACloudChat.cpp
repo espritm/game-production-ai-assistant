@@ -8,25 +8,55 @@
 #include "Misc/ScopeLock.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#include "Modules/ModuleManager.h"
 
 namespace
 {
-TArray<FHttpRequestPtr> ModuleRequests;
+struct FOwnedRequest
+{
+    FHttpRequestPtr Request;
+    FGPAATaskPtr Task;
+    TWeakPtr<FGPAACloudChat, ESPMode::ThreadSafe> Owner;
+};
+TArray<FOwnedRequest> ModuleRequests;
+bool bHttpStopping = false;
 }
 
+void FGPAACloudChat::InitializeRequests()
+{
+    bHttpStopping = false;
+}
 void FGPAACloudChat::ShutdownRequests()
 {
-    bool Pending=false;
-    for(const auto& Request:ModuleRequests)
+    if (bHttpStopping) return;
+    bHttpStopping = true;
+    auto Requests = MoveTemp(ModuleRequests);
+    // Stop callbacks before touching transport; owners must release their request
+    // references while HTTP is still alive, not in late object destructors.
+    for (const auto& Entry : Requests)
     {
-        if(!Request)continue;
-        Request->OnProcessRequestComplete().Unbind();
-        Pending|=FHttpModule::Get().GetHttpManager().IsValidRequest(Request.Get());
-        Request->CancelRequest();
+        if (Entry.Task) Entry.Task->Cancelled.Store(true);
+        auto Owner = Entry.Owner.Pin();
+        if (Owner && Owner->ActiveRequest == Entry.Request) Owner->ActiveRequest.Reset();
+        // Keep the owner alive until its completion delegate has been released;
+        // a delegate may itself hold the provider's last shared reference.
+        if (Entry.Request) Entry.Request->OnProcessRequestComplete().Unbind();
     }
-    if(Pending)FHttpModule::Get().GetHttpManager().Flush(EHttpFlushReason::Shutdown);
-    ModuleRequests.Reset();
+    auto* Http = FModuleManager::GetModulePtr<FHttpModule>(TEXT("HTTP"));
+    bool Pending=false;
+    if (Http)
+    {
+        for (const auto& Entry : Requests)
+        {
+            if (!Entry.Request) continue;
+            Pending |= Http->GetHttpManager().IsValidRequest(Entry.Request.Get());
+            Entry.Request->CancelRequest();
+        }
+        if (Pending) Http->GetHttpManager().Flush(EHttpFlushReason::Shutdown);
+    }
+    Requests.Reset();
     FTaskGraphInterface::Get().ProcessThreadUntilIdle(ENamedThreads::GameThread);
+    UE_LOG(LogTemp, Display, TEXT("GPAA HTTP request shutdown complete."));
 }
 
 bool FGPAASseDecoder::Event(const FString &Data, TArray<FString> &Deltas, FString &Error)
@@ -145,13 +175,26 @@ void FGPAACloudChat::Cancel()
         ActiveTask->Cancelled.Store(true);
     if (ActiveRequest)
     {
-        ActiveRequest->CancelRequest();
+        ActiveRequest->OnProcessRequestComplete().Unbind();
+        if (!bHttpStopping && !IsEngineExitRequested() && FModuleManager::GetModulePtr<FHttpModule>(TEXT("HTTP")))
+            ActiveRequest->CancelRequest();
         ActiveRequest.Reset();
     }
 }
 void FGPAACloudChat::Start(const FGPAAChatRequest &Request, FGPAATextEvent OnText, FGPAAChatFinished OnFinished)
 {
     Cancel();
+    if (bHttpStopping || IsEngineExitRequested())
+    {
+        OnFinished(false, TEXT("The assistant HTTP provider is shutting down."));
+        return;
+    }
+    auto* Http = FModuleManager::GetModulePtr<FHttpModule>(TEXT("HTTP"));
+    if (!Http)
+    {
+        OnFinished(false, TEXT("The HTTP module is unavailable."));
+        return;
+    }
     FString Base = Request.Endpoint.TrimStartAndEnd();
     Base.RemoveFromEnd(TEXT("/"));
     if ((!Base.StartsWith(TEXT("https://")) && !Base.StartsWith(TEXT("http://127.0.0.1:"))) ||
@@ -184,9 +227,9 @@ void FGPAACloudChat::Start(const FGPAAChatRequest &Request, FGPAATextEvent OnTex
     auto Decoder = MakeShared<FGPAASseDecoder, ESPMode::ThreadSafe>();
     auto Mutex = MakeShared<FCriticalSection, ESPMode::ThreadSafe>();
     auto ParseError = MakeShared<FString, ESPMode::ThreadSafe>();
-    ActiveRequest = FHttpModule::Get().CreateRequest();
-    ModuleRequests.RemoveAll([](const FHttpRequestPtr& Item){return !FHttpModule::Get().GetHttpManager().IsValidRequest(Item.Get());});
-    ModuleRequests.Add(ActiveRequest);
+    ActiveRequest = Http->CreateRequest();
+    ModuleRequests.RemoveAll([Http](const FOwnedRequest& Item){return !Http->GetHttpManager().IsValidRequest(Item.Request.Get());});
+    ModuleRequests.Add({ActiveRequest, Task, AsShared()});
     ActiveRequest->SetURL(Base + (Request.Responses ? TEXT("/responses") : TEXT("/chat/completions")));
     ActiveRequest->SetVerb(TEXT("POST"));
     ActiveRequest->SetHeader(TEXT("Content-Type"), TEXT("application/json"));

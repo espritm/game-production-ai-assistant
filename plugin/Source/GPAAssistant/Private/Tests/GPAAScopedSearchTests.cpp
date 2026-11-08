@@ -5,8 +5,9 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
+#include "Infrastructure/GPAANativeStorage.h"
 
-struct FGPAAScopedSearchState { bool Done=false, Ok=false; FString Error; TArray<FGPAASourceReference> Sources; };
+struct FGPAAScopedSearchState { bool Done=false, Ok=false; FString Root, Error; TArray<FGPAASourceReference> Sources; };
 DEFINE_LATENT_AUTOMATION_COMMAND_THREE_PARAMETER(FGPAAWaitForScopedSearch, TSharedPtr<FGPAAScopedSearchState>, State,
     double, Deadline, FAutomationTestBase*, Test);
 bool FGPAAWaitForScopedSearch::Update()
@@ -16,6 +17,10 @@ bool FGPAAWaitForScopedSearch::Update()
     Test->TestEqual(TEXT("Only the matching asset is retrieved, despite code in the index"), State->Sources.Num(), 1);
     for (const auto& Source : State->Sources)
         Test->TestEqual(TEXT("No code leaks into asset-only retrieval"), Source.SourceType, FString(TEXT("Asset")));
+    FString HistoryError;
+    FGPAANativeStorage Store(FGPAANativeRuntime::DatabasePath(State->Root));
+    const FString History=Store.History(HistoryError);
+    Test->TestTrue(TEXT("Completed search is persisted before UI completion"),History.Contains(TEXT("[Search — Asset]")) && History.Contains(TEXT("stamina regeneration")) && History.Contains(TEXT("asset:/Game/Stamina.Stamina")));
     if (!State->Error.IsEmpty()) Test->AddError(State->Error);
     return true;
 }
@@ -28,6 +33,7 @@ bool FGPAAScopedSearchTest::RunTest(const FString& Parameters)
     FFileHelper::SaveStringToFile(TEXT("// Stamina regeneration after a cooldown."), *(Root / TEXT("Source/Stamina.cpp")));
     const FString Metadata = TEXT("{\"assets\":[{\"objectPath\":\"/Game/Stamina.Stamina\",\"assetName\":\"Stamina regeneration\"}]}");
     auto State = MakeShared<FGPAAScopedSearchState>();
+    State->Root=Root;
     FGPAANativeRuntime::Get()->Run(Root, Metadata, TEXT("stamina regeneration"), false, false,
         [](const FString&) {}, [](const FString&) {},
         [State](bool Ok, const FString& Message, const FGPAANativeResult& Result)

@@ -11,7 +11,8 @@ class FGPAANativeStorage final : public IGPAAKnowledgeRepository
     virtual bool Load(FGPAASnapshot &Result, FString &Error) override;
     virtual bool Replace(const FGPAASnapshot &Value, FString &Error) override;
     bool AddHistory(const FString &Question, const FString &Answer, bool Complete, FString &Error,
-                    const FString &SourcesJson = TEXT("[]"));
+                    const FString &SourcesJson = TEXT("[]"), const FString& Kind = TEXT("Prompt"),
+                    const FString& Scope = TEXT("All"));
     bool ImportLegacyHistory(const FString &JsonPath, FString &Error);
     FString History(FString &Error);
     bool IsReady(FString &Error) const;

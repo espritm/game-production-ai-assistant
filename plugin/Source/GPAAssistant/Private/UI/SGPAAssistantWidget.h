@@ -11,6 +11,7 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 class SEditableTextBox;
+class SButton;
 class SMultiLineEditableTextBox;
 class STableViewBase;
 class STextBlock;
@@ -33,6 +34,11 @@ private:
     friend class FGPAAPromptLayoutTest;
     friend class FGPAASearchLayoutTest;
     friend class FGPAAViewSelectorTest;
+    friend class FGPAACancelUiTest;
+    EVisibility GetRequestCancelVisibility(bool ForAsk) const;
+    TSharedPtr<SButton> PromptCancelButton, SearchCancelButton;
+    bool bCancellable = false;
+    bool bRequestIsAsk = false;
     void OnViewSelectionChanged(int32 Index);
     TSharedPtr<SSegmentedControl<int32>> ViewSelector;
     void SetAnswerText(const FString& Text);
