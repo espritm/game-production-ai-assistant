@@ -1,5 +1,6 @@
 // Copyright Game Production AI Assistant contributors 2026.
 #include "Application/GPAANativeRuntime.h"
+#include "GPAALocalModels.h"
 #include "Infrastructure/GPAANativeStorage.h"
 #include "Settings/GPAAEditorSettings.h"
 #include "Async/Async.h"
@@ -132,6 +133,7 @@ TSharedRef<FGPAANativeRuntime, ESPMode::ThreadSafe> FGPAANativeRuntime::Get()
         Instance->Embeddings = MakeShared<FGPAAMiniLM, ESPMode::ThreadSafe>(
             IPluginManager::Get().FindPlugin(TEXT("GameProductionAIAssistant"))->GetBaseDir());
         Instance->Cloud = MakeShared<FGPAACloudChat, ESPMode::ThreadSafe>();
+        Instance->Local = MakeShared<FGPAALocalChat, ESPMode::ThreadSafe>();
     }
     return Instance.ToSharedRef();
 }
@@ -140,6 +142,7 @@ void FGPAANativeRuntime::Shutdown()
     if (!Instance)
         return;
     Instance->Cancel();
+    if (Instance->Local) Instance->Local->Wait();
     for (auto &Job : Instance->Jobs)
         Job.Wait();
     Instance->Jobs.Reset();
@@ -165,16 +168,16 @@ void FGPAANativeRuntime::StoreHistory(bool Complete, TFunction<void(const FStrin
         return;
     }
     const FString Root = ChatRoot, Question = MoveTemp(ChatQuestion), Answer = MoveTemp(ChatAnswer),
-                  SourcesJson = MoveTemp(ChatSources);
+                  SourcesJson = MoveTemp(ChatSources), ProviderName = MoveTemp(ChatProviderName), ModelName = MoveTemp(ChatModelName);
     auto Self = AsShared();
     Jobs.Add(Async(EAsyncExecution::ThreadPool,
-                   [Self, Root, Question, Answer, Complete, SourcesJson, OnSaved]()
+                   [Self, Root, Question, Answer, Complete, SourcesJson, ProviderName, ModelName, OnSaved]()
                    {
                        FString Error;
                        {
                            FScopeLock Lock(&Self->IndexMutex);
                            FGPAANativeStorage Store(DatabasePath(Root));
-                           if (!Store.AddHistory(Question, Answer, Complete, Error, SourcesJson))
+                           if (!Store.AddHistory(Question, Answer, Complete, Error, SourcesJson, TEXT("Prompt"), TEXT("All"), ProviderName, ModelName))
                                UE_LOG(LogTemp, Warning, TEXT("GPAA could not save local conversation history: %s"),
                                       *Error);
                        }
@@ -189,11 +192,12 @@ void FGPAANativeRuntime::Cancel()
         CurrentTask->Cancelled.Store(true);
     if (Cloud)
         Cloud->Cancel();
+    if (Local) Local->Cancel();
     StoreHistory(false);
 }
 bool FGPAANativeRuntime::IsBusy() const
 {
-    if (bRunning) return true;
+    if (bRunning || (Local && Local->IsBusy())) return true;
     for (const auto& Job : Jobs) if (!Job.IsReady()) return true;
     return false;
 }
@@ -237,37 +241,44 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
         Completion(Ok, Message, Result);
     };
     FGPAAChatRequest ChatRequest;
+    ChatRequest.OnStatus = [Weak, Task, OnStatus](const FString& Message)
+    { if (Weak.IsValid() && !Task->Cancelled.Load()) OnStatus(Message); };
     if (Ask)
     {
         const auto *Settings = GetDefault<UGPAAEditorSettings>();
-        if (Settings->ChatProvider != TEXT("OpenAI") && Settings->ChatProvider != TEXT("OpenAICompatible"))
-        {
-            OnFinished(
-                false,
-                TEXT("Native chat currently supports OpenAI or OpenAICompatible. Select a cloud provider in Settings."),
-                {});
-            return;
-        }
-        ChatRequest.Endpoint = Settings->OpenAIBaseUrl;
-        ChatRequest.Model = Settings->OpenAIModel;
-        ChatRequest.Responses = Settings->ChatProvider == TEXT("OpenAI");
+        ChatRequest.Local = Settings->ChatProvider == TEXT("Local");
+        ChatRequest.RequireProjectEvidence = ChatRequest.Local;
         ChatRequest.MaxOutputTokens = Settings->MaxOutputTokens;
         ChatRequest.Timeout = Settings->TimeoutSeconds;
-        FGPAANativeSecrets Secrets;
-        ChatRequest.Key = Secrets.Read(FGPAANativeSecrets::Scope(ChatRequest.Endpoint));
-        if (ChatRequest.Key.IsEmpty())
+        if (ChatRequest.Local)
         {
-            OnFinished(false, TEXT("Open Settings, enter your personal API key and use Save Personal Key."), {});
-            return;
+            const auto* Model = FGPAALocalModels::Find(Settings->LocalModelId);
+            ChatRequest.LocalCustomModel = !Settings->LocalModelFile.IsEmpty();
+            ChatRequest.Model = ChatRequest.LocalCustomModel ? FPaths::GetCleanFilename(Settings->LocalModelFile) : Settings->LocalModelId;
+            if (!ChatRequest.LocalCustomModel && !Model)
+            { OnFinished(false, TEXT("Select a supported local model in Settings."), {}); return; }
+            ChatRequest.LocalModelPath = ChatRequest.LocalCustomModel ? Settings->LocalModelFile : FGPAALocalModels::ModelPath(*Model);
+            ChatRequest.LocalContextTokens = Settings->LocalContextTokens;
+            ChatRequest.LocalThreads = Settings->LocalThreads;
+            if (!IFileManager::Get().FileExists(*ChatRequest.LocalModelPath))
+            { OnFinished(false, TEXT("Local model is missing. In Settings > Local AI, download the selected model or browse to an existing GGUF. No cloud fallback was made."), {}); return; }
         }
-        if (!Settings->bCloudContextAccepted)
+        else
         {
-            OnFinished(
-                false,
-                TEXT("Enable Cloud Context Consent in Settings before sending project excerpts to your provider."), {});
-            return;
+            if (Settings->ChatProvider != TEXT("OpenAI") && Settings->ChatProvider != TEXT("OpenAICompatible"))
+            { OnFinished(false, TEXT("Select Local, OpenAI or OpenAICompatible in Settings."), {}); return; }
+            ChatRequest.Endpoint = Settings->OpenAIBaseUrl;
+            ChatRequest.Model = Settings->OpenAIModel;
+            ChatRequest.Responses = Settings->ChatProvider == TEXT("OpenAI");
+            FGPAANativeSecrets Secrets;
+            ChatRequest.Key = Secrets.Read(FGPAANativeSecrets::Scope(ChatRequest.Endpoint));
+            if (ChatRequest.Key.IsEmpty())
+            { OnFinished(false, TEXT("Open Settings, enter your personal API key and use Save Personal Key."), {}); return; }
+            if (!Settings->bCloudContextAccepted)
+            { OnFinished(false, TEXT("Enable Cloud Context Consent in Settings before sending project excerpts to your provider."), {}); return; }
         }
     }
+
     OnStatus(TEXT("Refreshing local project index..."));
     Jobs.Add(Async(
         EAsyncExecution::ThreadPool,
@@ -313,21 +324,28 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
                 if (Ok && Ask)
                 {
                     int32 Characters = 0, Keep = 0;
+                    const int32 ContextCharacters = ChatRequest.Local
+                        ? FMath::Clamp((ChatRequest.LocalContextTokens - ChatRequest.MaxOutputTokens - 512) * 2 - Query.Len(), 0, 12000)
+                        : 12000;
                     for (const auto &P : Sources)
                     {
                         int32 Size = FString::Printf(TEXT("Source: %s:%d-%d\n%s\n"), *P.Path, P.FirstLine, P.LastLine,
                                                      *P.Content)
                                          .Len();
-                        if (Characters + Size > 12000)
+                        if (Characters + Size > ContextCharacters)
                             break;
                         Characters += Size;
                         ++Keep;
                     }
+                    if (ChatRequest.Local && Keep == 0 && !Sources.IsEmpty())
+                    { Ok = false; Error = TEXT("The local context budget cannot fit a retrieved passage. Shorten the question, lower Max Output Tokens or increase Local Context Tokens."); }
                     Sources.SetNum(Keep);
                 }
             }
             FGPAANativeResult Result = Convert(Report, Sources);
             ChatRequest.Prompt = FGPAACore::Prompt(Query, Sources);
+            ChatRequest.HasProjectEvidence = !Sources.IsEmpty();
+            for (const auto& Source : Sources) ChatRequest.SourceEvidence += Source.Path + TEXT("\n") + Source.Content + TEXT("\n");
             AsyncTask(
                 ENamedThreads::GameThread,
                 [Weak, Task, ProjectRoot, Query, Ask, RefreshOnly, ChatRequest, OnText, OnFinished, Result, Error,
@@ -341,6 +359,8 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
                         OnFinished(Ok, Ok && Error.IsEmpty() ? TEXT("Local project knowledge is ready.") : Error, Result);
                         return;
                     }
+                    Pinned->ChatProviderName = ChatRequest.Local ? TEXT("Local") : (ChatRequest.Responses ? TEXT("OpenAI") : TEXT("OpenAICompatible"));
+                    Pinned->ChatModelName = ChatRequest.Model;
                     Pinned->ChatQuestion = Query;
                     Pinned->ChatRoot = ProjectRoot;
                     Pinned->ChatAnswer.Reset();
@@ -350,7 +370,9 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
                             FString::Printf(TEXT("%s:%d-%d"), *Source.RelativePath, Source.StartLine, Source.EndLine)));
                     Pinned->ChatSources.Reset();
                     FJsonSerializer::Serialize(References, TJsonWriterFactory<>::Create(&Pinned->ChatSources));
-                    Pinned->Cloud->Start(
+                    TSharedPtr<IGPAAChatProvider, ESPMode::ThreadSafe> Provider = ChatRequest.Local
+                        ? StaticCastSharedPtr<IGPAAChatProvider>(Pinned->Local) : StaticCastSharedPtr<IGPAAChatProvider>(Pinned->Cloud);
+                    Provider->Start(
                         ChatRequest,
                         [Weak, Task, OnText](const FString &Delta)
                         {

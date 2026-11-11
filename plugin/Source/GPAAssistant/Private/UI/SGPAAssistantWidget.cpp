@@ -402,6 +402,7 @@ void SGPAAssistantWidget::StartNative(bool Ask)
     TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
     bCancellable = true;
     bRequestIsAsk = Ask;
+    if (Ask) ActiveChatProviderName = GetSelectedChatProviderName();
     NativeAnswer.Reset(); SetBusy(TEXT("Preparing local project knowledge..."));
     if (Ask) SetAnswerText(TEXT(""));
     FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, false,
@@ -486,7 +487,7 @@ void SGPAAssistantWidget::SetChatResult(bool bSucceeded, const FString& Message,
 {
     StopBusy();
     StatusText->SetText(FText::FromString(bSucceeded
-        ? FString::Printf(TEXT("Answer complete via %s"), *GetSelectedChatProviderName())
+        ? FString::Printf(TEXT("Answer complete via %s"), ActiveChatProviderName.IsEmpty() ? *GetSelectedChatProviderName() : *ActiveChatProviderName)
         : TEXT("Error")));
     SetAnswerText(bSucceeded ? Answer : Message);
 
@@ -609,6 +610,7 @@ void SGPAAssistantWidget::InitializeChatProviderOptions()
     ChatProviderModes.Reset();
     ChatProviderModes.Add(MakeShared<FString>(TEXT("OpenAI")));
     ChatProviderModes.Add(MakeShared<FString>(ChatProviderOpenAICompatible));
+    ChatProviderModes.Add(MakeShared<FString>(TEXT("Local")));
     SelectedChatProviderMode=ChatProviderModes[0];
 }
 
@@ -783,7 +785,10 @@ FText SGPAAssistantWidget::GetSelectedChatProviderText() const
 FText SGPAAssistantWidget::GetSettingsSummaryText() const
 {
     const auto* Settings=GetDefault<UGPAAEditorSettings>();
-    return FText::FromString(FString::Printf(TEXT("Provider: %s | Model: %s | Search: local"),*Settings->ChatProvider,*Settings->OpenAIModel));
+    const FString Model = Settings->ChatProvider == TEXT("Local")
+        ? (Settings->LocalModelFile.IsEmpty() ? Settings->LocalModelId : FPaths::GetCleanFilename(Settings->LocalModelFile))
+        : Settings->OpenAIModel;
+    return FText::FromString(FString::Printf(TEXT("Provider: %s | Model: %s | Search: local"), *Settings->ChatProvider, *Model));
 }
 
 EVisibility SGPAAssistantWidget::GetCustomSourceOpenerVisibility() const

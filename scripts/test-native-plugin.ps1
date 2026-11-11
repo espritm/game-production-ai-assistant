@@ -8,12 +8,21 @@ param(
     [string] $AcceptanceProject,
     [string] $WorkspaceRoot,
     [switch] $InteractiveAssetEditor,
-    [switch] $HttpShutdownAcceptance
+    [switch] $HttpShutdownAcceptance,
+    [switch] $LocalAIAcceptance,
+    [switch] $LocalOfflineOnly,
+    [string] $LocalModelCache
 )
 $ErrorActionPreference = 'Stop'
+if($LocalOfflineOnly -and !$LocalAIAcceptance){throw 'LocalOfflineOnly requires LocalAIAcceptance.'}
 if ($HttpShutdownAcceptance) {
     if ($AcceptanceProject -or $InteractiveAssetEditor) { throw 'HTTP shutdown acceptance must run in isolation.' }
     $TestFilter='GPAA.Acceptance.HttpShutdown'
+}
+if ($LocalAIAcceptance) {
+    if ($HttpShutdownAcceptance -or $AcceptanceProject -or $InteractiveAssetEditor) {throw 'Local AI acceptance must run in isolation.'}
+    $TestFilter='GPAA.Acceptance.LocalAI'
+    $TimeoutSeconds=[Math]::Max($TimeoutSeconds,1200)
 }
 Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
@@ -63,6 +72,12 @@ $args = @('"' + (Join-Path $projectRoot 'Host.uproject') + '"', '-unattended','-
 if ($AcceptanceProject) { $args += '-GPAARealAssets' }
 if ($InteractiveAssetEditor) { $args += '-GPAAInteractiveAssetTest' }
 if ($HttpShutdownAcceptance) { $args += '-GPAAHttpShutdownAcceptance' }
+if ($LocalAIAcceptance) {
+    if (!$LocalModelCache) {$LocalModelCache=Join-Path $root '.gpaa\local-ai\models'}
+    $args += '-GPAALocalAcceptance'
+    $args += '-GPAALocalCache="'+[IO.Path]::GetFullPath($LocalModelCache)+'"'
+    if($LocalOfflineOnly){$args+='-GPAALocalOfflineOnly'}
+}
 Write-Host "Native smoke evidence: $run"
 $proc = Start-Process $editor -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $run 'stdout.log') -RedirectStandardError (Join-Path $run 'stderr.log')
 $null = $proc.Handle
@@ -75,6 +90,8 @@ try {
         throw "Native Unreal tests failed. See $report"
     }
     $requiredTests=@('GPAA.Native.UI.ContextualCancellation','GPAA.Native.Storage.MixedHistoryMigration','GPAA.Native.UI.SegmentedViewSelection','GPAA.Native.UI.SearchScopeRadios','GPAA.Native.Workflow.ScopedAssetSearch','GPAA.Native.UI.PromptBottomAlignment','GPAA.Native.UI.HistoryExclusiveView','GPAA.Native.Workflow.BackgroundIndexNonPreemptive','GPAA.Native.UI.SettingsCredentialActions','GPAA.Native.Cloud.StreamingBoundaries','GPAA.Native.Cloud.HttpContract.Responses','GPAA.Native.Cloud.HttpContract.ChatCompletions','GPAA.Native.Embeddings.Corpus','GPAA.Native.Storage.AtomicRollbackAndHistory','GPAA.Native.Workflow.OfflineIndexAndSearch')
+    $requiredTests+=@('GPAA.Native.LocalAI.EmptyEvidenceGuard','GPAA.Native.LocalAI.StreamingUtf8','GPAA.Native.LocalAI.ModelIntegrity','GPAA.Native.LocalAI.NoCloudFallback','GPAA.Native.LocalAI.PortableProfiles')
+    if ($LocalAIAcceptance) { $requiredTests=@('GPAA.Acceptance.LocalAI.DownloadResumeAndGeneration') }
     if ($HttpShutdownAcceptance) { $requiredTests=@('GPAA.Acceptance.HttpShutdown.PendingAndLateRequests') }
     foreach ($test in $requiredTests) {
         if (@($result.tests | Where-Object { $_.fullTestPath -eq $test -and $_.state -eq 'Success' }).Count -ne 1) { throw "Required native test missing: $test" }

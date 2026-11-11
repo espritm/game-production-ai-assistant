@@ -4,7 +4,7 @@ An open-source, local-first AI assistant for AAA game production pipelines.
 
 ## Current Implementation Status
 
-The repository contains the original V1 backend and a native Unreal migration for delivery A. The native plugin embeds local CPU search and connects directly to a user-selected cloud chat provider, without requiring a companion application. UE 5.6 validation is available; UE 5.8 and the remaining Fab release gates are tracked in [Native delivery A status](docs/native-delivery-a-status.md).
+The native Windows Unreal Editor plugin provides local CPU search and a choice of local or cloud chat without a companion application. Version 0.3.0 adds an integrated CPU local chat engine and explicit, verified GGUF model downloads. Read the [native user guide](docs/native-user-guide.md), [local AI implementation notes](docs/local-ai-implementation.md), and [delivery A history](docs/native-delivery-a-status.md). The original V1 backend remains in the repository as a development reference.
 
 The original foundation includes:
 
@@ -30,7 +30,7 @@ Build and validate the native plugin (build-time dependency downloads are pinned
 
 ```powershell
 .\scripts\package-native-plugin.ps1
-.\scripts\test-native-plugin.ps1 -PackagePath .gpaa\releases\GameProductionAIAssistant-native-v0.2.0-UE5.6-Win64.zip -TestFilter GPAA
+.\scripts\test-native-plugin.ps1 -PackagePath .gpaa\releases\GameProductionAIAssistant-native-v0.3.0-UE5.6-Win64.zip -TestFilter GPAA
 ```
 
 Read the [native user guide](docs/native-user-guide.md) and the [implementation plan](docs/native-plugin-implementation-plan.md). For the retained .NET reference backend, use the following commands.

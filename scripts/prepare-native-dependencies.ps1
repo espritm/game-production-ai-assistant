@@ -45,4 +45,5 @@ foreach ($asset in $manifest.assets) {
     } else { Copy-Item -LiteralPath $download -Destination $target -Force }
 }
 if ($RecordHashes) { $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8 }
+& (Join-Path $PSScriptRoot 'build-local-runtime.ps1')
 Write-Host 'Native dependencies are ready and SHA256 verified.'

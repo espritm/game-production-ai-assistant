@@ -6,6 +6,8 @@
 #include "DetailWidgetRow.h"
 #include "IPropertyUtilities.h"
 #include "PropertyHandle.h"
+#include "GPAALocalModels.h"
+#include "GPAALocalChat.h"
 #include "IDetailPropertyRow.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SButton.h"
@@ -56,6 +58,34 @@ void FGPAAEditorSettingsDetails::CustomizeDetails(IDetailLayoutBuilder& Builder)
             { return FText::FromString(Settings.IsValid() ? Settings.Get()->*Member : FString()); })];
     };
     AddStatus(TEXT("Chat"), &UGPAAEditorSettings::LastKeyResult);
+    auto& Local = Builder.EditCategory(TEXT("Local AI"));
+    Local.AddProperty(Builder.GetProperty(GET_MEMBER_NAME_CHECKED(UGPAAEditorSettings, LocalModelId)))
+        .IsEnabled(TAttribute<bool>::CreateLambda([]() { return !FGPAALocalModels::Get().IsBusy(); }));
+    Local.AddCustomRow(FText::FromString(TEXT("Model download information"))).WholeRowContent()
+        [SNew(STextBlock).AutoWrapText(true).Text_Lambda([Settings]()
+        { return FText::FromString(Settings.IsValid() ? Settings->GetLocalModelDescription() : FString()); })];
+    const auto ModelFile = Builder.GetProperty(GET_MEMBER_NAME_CHECKED(UGPAAEditorSettings, LocalModelFile));
+    Local.AddProperty(ModelFile).CustomWidget()
+        .NameContent()[ModelFile->CreatePropertyNameWidget()]
+        .ValueContent().MinDesiredWidth(480)
+        [SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1)[ModelFile->CreatePropertyValueWidget()]
+            + SHorizontalBox::Slot().AutoWidth().Padding(6, 0)[MakeAction(TEXT("Browse..."), &UGPAAEditorSettings::ChooseLocalModelFile)]
+            + SHorizontalBox::Slot().AutoWidth()[MakeAction(TEXT("Use Downloaded Model"), &UGPAAEditorSettings::ClearLocalModelFile)]];
+    auto DownloadButton = MakeAction(TEXT("Download Selected Model"), &UGPAAEditorSettings::DownloadLocalModel);
+    auto CancelButton = MakeAction(TEXT("Cancel Download"), &UGPAAEditorSettings::CancelLocalDownload);
+    auto RemoveButton = MakeAction(TEXT("Remove Downloaded Model"), &UGPAAEditorSettings::RemoveLocalModel);
+    DownloadButton->SetEnabled(TAttribute<bool>::CreateLambda([]() { return !FGPAALocalModels::Get().IsBusy(); }));
+    CancelButton->SetEnabled(TAttribute<bool>::CreateLambda([]() { return FGPAALocalModels::Get().IsBusy(); }));
+    RemoveButton->SetEnabled(TAttribute<bool>::CreateLambda([]() { return !FGPAALocalModels::Get().IsBusy() && !FGPAALocalChat::IsAnyBusy(); }));
+    Local.AddCustomRow(FText::FromString(TEXT("Download local model"))).WholeRowContent()
+        [SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth()[DownloadButton]
+            + SHorizontalBox::Slot().AutoWidth().Padding(6, 0)[CancelButton]
+            + SHorizontalBox::Slot().AutoWidth()[RemoveButton]];
+    Local.AddCustomRow(FText::FromString(TEXT("Local model status"))).WholeRowContent()
+        [SNew(STextBlock).AutoWrapText(true).Text_Lambda([]()
+        { return FText::FromString(FGPAALocalModels::Get().Status()); })];
     auto& Profiles = Builder.EditCategory(TEXT("Import / Export"));
     Profiles.AddCustomRow(FText::FromString(TEXT("Export Settings Profile"))).WholeRowContent()
         [MakeAction(TEXT("Export Settings Profile"), &UGPAAEditorSettings::ExportSettingsProfile)];

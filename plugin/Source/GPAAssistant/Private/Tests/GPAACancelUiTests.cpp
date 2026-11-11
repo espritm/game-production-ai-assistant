@@ -2,6 +2,7 @@
 #include "Misc/AutomationTest.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "UI/SGPAAssistantWidget.h"
+#include "Settings/GPAAEditorSettings.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/Text/STextBlock.h"
@@ -47,6 +48,12 @@ bool FGPAACancelUiTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Cancellation hides both buttons"),Panel->GetRequestCancelVisibility(true)==EVisibility::Collapsed && Panel->GetRequestCancelVisibility(false)==EVisibility::Collapsed);
     Panel->bCancellable=true; Panel->SetBusy(TEXT("Indexing")); Panel->StopBusy();
     TestTrue(TEXT("Completion also removes cancellation"),Panel->GetRequestCancelVisibility(false)==EVisibility::Collapsed);
+    auto* Settings=GetMutableDefault<UGPAAEditorSettings>();
+    const FString SavedProvider=Settings->ChatProvider;
+    Panel->ActiveChatProviderName=TEXT("OpenAI"); Settings->ChatProvider=TEXT("Local");
+    Panel->SetChatResult(true,TEXT(""),TEXT("Answer"),{});
+    TestEqual(TEXT("Changing settings cannot relabel a completed cloud answer as local"),Panel->StatusText->GetText().ToString(),FString(TEXT("Answer complete via OpenAI")));
+    Settings->ChatProvider=SavedProvider;
     return true;
 }
 #endif

@@ -1,6 +1,6 @@
 // Copyright Game Production AI Assistant contributors 2026.
 #include "Settings/GPAAEditorSettings.h"
-#include "Application/GPAANativeRuntime.h"
+#include "GPAALocalModels.h"
 #include "Infrastructure/GPAANativeStorage.h"
 #include "DesktopPlatformModule.h"
 #include "IDesktopPlatform.h"
@@ -15,6 +15,7 @@
 UGPAAEditorSettings::UGPAAEditorSettings()
 {
     ChatProvider = TEXT("OpenAI");
+    LocalModelId = TEXT("qwen2.5-coder-1.5b-q4km");
     OpenAIBaseUrl = TEXT("https://api.openai.com/v1");
     OpenAIModel = TEXT("gpt-4.1-mini");
     SourceOpenerMode = TEXT("Auto");
@@ -113,6 +114,9 @@ bool UGPAAEditorSettings::ExportSettingsProfileToFile(const FString& Path)
     Json->SetStringField(TEXT("chatProvider"), ChatProvider);
     Json->SetStringField(TEXT("openAIBaseUrl"), OpenAIBaseUrl);
     Json->SetStringField(TEXT("openAIModel"), OpenAIModel);
+    Json->SetStringField(TEXT("localModelId"), LocalModelId);
+    Json->SetNumberField(TEXT("localContextTokens"), LocalContextTokens);
+    Json->SetNumberField(TEXT("localThreads"), LocalThreads);
     Json->SetNumberField(TEXT("timeoutSeconds"), TimeoutSeconds);
     Json->SetNumberField(TEXT("maxOutputTokens"), MaxOutputTokens);
     Json->SetStringField(TEXT("sourceOpenerMode"), SourceOpenerMode);
@@ -143,6 +147,8 @@ bool UGPAAEditorSettings::ImportSettingsProfileFromFile(const FString& Path)
     Read(TEXT("chatProvider"), ChatProvider);
     Read(TEXT("openAIBaseUrl"), OpenAIBaseUrl);
     Read(TEXT("openAIModel"), OpenAIModel);
+    FString ModelId;
+    if (Json->TryGetStringField(TEXT("localModelId"), ModelId) && FGPAALocalModels::Find(ModelId)) LocalModelId = ModelId;
     Read(TEXT("sourceOpenerMode"), SourceOpenerMode);
     Read(TEXT("customSourceOpenerCommand"), CustomSourceOpenerCommand);
     int32 Value;
@@ -150,9 +156,37 @@ bool UGPAAEditorSettings::ImportSettingsProfileFromFile(const FString& Path)
         TimeoutSeconds = FMath::Clamp(Value, 5, 600);
     if (Json->TryGetNumberField(TEXT("maxOutputTokens"), Value))
         MaxOutputTokens = FMath::Clamp(Value, 64, 32768);
+    if (Json->TryGetNumberField(TEXT("localContextTokens"), Value)) LocalContextTokens = FMath::Clamp(Value, 2048, 8192);
+    if (Json->TryGetNumberField(TEXT("localThreads"), Value)) LocalThreads = FMath::Clamp(Value, 1, 8);
     bCloudContextAccepted = false;
     SaveConfig();
     LastProfileResult =
         TEXT("Profile imported. Keys were ignored; review the provider and enable cloud consent again.");
     return true;
+}
+
+TArray<FString> UGPAAEditorSettings::GetChatProviderOptions() const
+{ return {TEXT("Local"), TEXT("OpenAI"), TEXT("OpenAICompatible")}; }
+TArray<FString> UGPAAEditorSettings::GetLocalModelOptions() const
+{ TArray<FString> Result; for (const auto& Model : FGPAALocalModels::Catalogue()) Result.Add(Model.Id); return Result; }
+void UGPAAEditorSettings::DownloadLocalModel() { FGPAALocalModels::Get().Download(LocalModelId); }
+void UGPAAEditorSettings::CancelLocalDownload() { FGPAALocalModels::Get().Cancel(); }
+void UGPAAEditorSettings::RemoveLocalModel() { FGPAALocalModels::Get().Remove(LocalModelId); }
+void UGPAAEditorSettings::ClearLocalModelFile() { LocalModelFile.Reset(); SaveConfig(); }
+void UGPAAEditorSettings::ChooseLocalModelFile()
+{
+    auto* Desktop = FDesktopPlatformModule::Get();
+    if (!Desktop || FApp::IsUnattended()) return;
+    const void* Parent = FSlateApplication::IsInitialized() ? FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr) : nullptr;
+    TArray<FString> Paths;
+    if (Desktop->OpenFileDialog(Parent, TEXT("Select a local instruction GGUF model"), FGPAALocalModels::CacheDirectory(), TEXT(""), TEXT("GGUF model (*.gguf)|*.gguf"), 0, Paths) && Paths.Num() == 1)
+    { LocalModelFile = FPaths::ConvertRelativePathToFull(Paths[0]); SaveConfig(); }
+}
+FString UGPAAEditorSettings::GetLocalModelDescription() const
+{
+    const auto* Model = FGPAALocalModels::Find(LocalModelId);
+    if (!Model) return TEXT("Select a supported local model.");
+    return FString::Printf(TEXT("%s | Download: %.2f GiB | Apache-2.0 | CPU / AVX2. Models come from Qwen on Hugging Face. Download only when requested. Allow additional RAM alongside Unreal (start with Light). Cache: %s. %s"),
+        *Model->Name, Model->Bytes / 1073741824.0, *FGPAALocalModels::CacheDirectory(),
+        IFileManager::Get().FileExists(*FGPAALocalModels::ModelPath(*Model)) ? TEXT("Downloaded; integrity is checked before use.") : TEXT("Model not downloaded."));
 }

@@ -15,7 +15,7 @@ class UGPAAEditorSettings final : public UDeveloperSettings
     UGPAAEditorSettings();
     UPROPERTY(EditAnywhere, Config, Category = "Project") FString ProjectRootOverride;
     UPROPERTY(EditAnywhere, Config, Category = "Chat",
-              meta = (ToolTip = "OpenAI uses Responses; OpenAICompatible uses streaming Chat Completions."))
+              meta = (GetOptions = "GetChatProviderOptions", ToolTip = "Local runs offline with a downloaded GGUF model; OpenAI and OpenAICompatible use cloud services."))
     FString ChatProvider;
     UPROPERTY(EditAnywhere, Config, Category = "Chat") FString OpenAIBaseUrl;
     UPROPERTY(EditAnywhere, Config, Category = "Chat") FString OpenAIModel;
@@ -33,6 +33,22 @@ class UGPAAEditorSettings final : public UDeveloperSettings
     int32 TimeoutSeconds = 120;
     UPROPERTY(EditAnywhere, Config, Category = "Chat", meta = (ClampMin = "64", ClampMax = "32768"))
     int32 MaxOutputTokens = 512;
+    UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (GetOptions = "GetLocalModelOptions"))
+    FString LocalModelId;
+    UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (ToolTip = "Optional existing instruction GGUF. Empty uses the selected downloaded model. This machine-specific path is excluded from profiles."))
+    FString LocalModelFile;
+    UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (ClampMin = "2048", ClampMax = "8192"))
+    int32 LocalContextTokens = 4096;
+    UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (ClampMin = "1", ClampMax = "8", ToolTip = "CPU threads reserved for local inference. Unreal also needs CPU and RAM."))
+    int32 LocalThreads = 4;
+    UFUNCTION() TArray<FString> GetChatProviderOptions() const;
+    UFUNCTION() TArray<FString> GetLocalModelOptions() const;
+    void DownloadLocalModel();
+    void CancelLocalDownload();
+    void RemoveLocalModel();
+    void ChooseLocalModelFile();
+    void ClearLocalModelFile();
+    FString GetLocalModelDescription() const;
     UPROPERTY(EditAnywhere, Config, Category = "Source Opener") FString SourceOpenerMode;
     UPROPERTY(EditAnywhere, Config, Category = "Source Opener") FString CustomSourceOpenerCommand;
     FString LastKeyResult;

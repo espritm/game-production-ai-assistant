@@ -115,7 +115,7 @@ private:
     TSharedPtr<FString> SelectedChatProviderMode;
     FString CustomSourceOpenerCommand = TEXT("code -g \"{file}:{line}\"");
     FString SelectedSearchScope = TEXT("All");
-    FString BusyBaseMessage;
+    FString BusyBaseMessage, ActiveChatProviderName;
     int32 BusyFrame = 0;
     int32 ActiveTabIndex = 0;
     bool bBusy = false;

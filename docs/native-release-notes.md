@@ -1,3 +1,15 @@
+# Game Production AI Assistant 0.3.0 — Local AI beta
+
+- Native CPU local chat provider, with no companion application or API key requirement.
+- Curated instruction GGUF catalogue with explicit downloads, resume/cancel, pinned SHA256 verification, managed removal and existing-file selection.
+- Source-grounded local streaming, token/context budgets, cooperative cancellation and shutdown cleanup.
+- Deterministic no-evidence response when no project sources are supplied; no automatic cloud fallback.
+- Provider/model identity in new history entries; transactional schema-3-to-4 migration preserves prior history and the index.
+- Portable local CPU/context preferences; machine-specific model paths are excluded from exports.
+- Existing cloud providers remain available. Local GPU acceleration and macOS are deferred.
+
+The 0.2.0 Fab dossier/archives remain separate. See the user guide for local setup, hardware limits and cache location.
+
 # Game Production AI Assistant 0.2.0 — Windows beta
 
 - Native local indexing, bundled CPU embeddings, semantic code/asset-metadata search and SQLite persistence.

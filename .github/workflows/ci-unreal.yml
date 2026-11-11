@@ -13,6 +13,10 @@ on:
         type: choice
         options: ['5.6', '5.8']
         default: '5.6'
+      localAIAcceptance:
+        description: Download and validate the light local chat model (about 1.04 GiB, cached on runner)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -94,6 +98,18 @@ jobs:
             -UnrealEngineRoot $env:GPAA_ENGINE_ROOT `
             -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip" `
             -HttpShutdownAcceptance
+
+      - name: Optional real local chat acceptance
+        if: github.event_name == 'workflow_dispatch' && inputs.localAIAcceptance
+        working-directory: ${{ env.GPAA_BUILD_ROOT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content plugin/GameProductionAIAssistant.uplugin -Raw | ConvertFrom-Json).VersionName
+          & .\scripts\test-native-plugin.ps1 `
+            -UnrealEngineRoot $env:GPAA_ENGINE_ROOT `
+            -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip" `
+            -LocalAIAcceptance `
+            -LocalModelCache (Join-Path $env:RUNNER_TOOL_CACHE 'gpaa-local-models')
 
       - name: Verify automatic startup and minute refresh without a panel
         working-directory: ${{ env.GPAA_BUILD_ROOT }}
