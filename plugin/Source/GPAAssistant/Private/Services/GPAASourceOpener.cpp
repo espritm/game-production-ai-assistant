@@ -1,8 +1,15 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "Services/GPAASourceOpener.h"
 
 #include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
 #include "Misc/Paths.h"
+#include "Misc/PackageName.h"
+#include "Editor.h"
+#include "Subsystems/AssetEditorSubsystem.h"
+#include "UObject/SoftObjectPath.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
 
 namespace
 {
@@ -14,6 +21,31 @@ namespace
     const FString SourceOpenerCustom = TEXT("Custom Command");
 }
 
+bool FGPAASourceOpener::ResolveAssetObjectPath(const FGPAASourceReference& Source, FString& OutPath)
+{
+    OutPath.Reset();
+    if (Source.RelativePath.StartsWith(TEXT("asset:")))
+    {
+        OutPath = Source.RelativePath.Mid(6);
+    }
+    else if (Source.SourceType.Equals(TEXT("Asset"), ESearchCase::IgnoreCase))
+    {
+        if (Source.RelativePath.StartsWith(TEXT("/"))) OutPath = Source.RelativePath;
+        else
+        {
+            TSharedPtr<FJsonObject> Metadata;
+            if (FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Source.Content), Metadata) && Metadata)
+                Metadata->TryGetStringField(TEXT("objectPath"), OutPath);
+        }
+    }
+    if (!FPackageName::IsValidObjectPath(OutPath))
+    {
+        OutPath.Reset();
+        return false;
+    }
+    return true;
+}
+
 bool FGPAASourceOpener::OpenSource(
     const FGPAASourceReference& Source,
     const FString& ProjectRoot,
@@ -21,10 +53,25 @@ bool FGPAASourceOpener::OpenSource(
     const FString& CustomCommand,
     FString& OutStatus)
 {
-    if (Source.SourceType.Equals(TEXT("Asset"), ESearchCase::IgnoreCase)
+    if (Source.RelativePath.StartsWith(TEXT("asset:"))
+        || Source.SourceType.Equals(TEXT("Asset"), ESearchCase::IgnoreCase)
         || Source.RelativePath.StartsWith(TEXT(".gpaa/unreal-assets/"), ESearchCase::IgnoreCase))
     {
-        OutStatus = TEXT("Asset metadata is a virtual knowledge source. Use the package path shown in the result to locate the asset in Unreal.");
+        FString ObjectPath;
+        if (!ResolveAssetObjectPath(Source, ObjectPath))
+        {
+            OutStatus = TEXT("Cannot open asset: this reference has no valid Unreal object path. Refresh Knowledge and search again.");
+            return false;
+        }
+        // Resolve locally through Unreal; asset references never launch an external application.
+        UObject* Asset = FSoftObjectPath(ObjectPath).TryLoad();
+        UAssetEditorSubsystem* Editors = GEditor ? GEditor->GetEditorSubsystem<UAssetEditorSubsystem>() : nullptr;
+        if (!Asset || !Editors || !Editors->OpenEditorForAsset(Asset))
+        {
+            OutStatus = FString::Printf(TEXT("Could not open asset in Unreal: %s"), *ObjectPath);
+            return false;
+        }
+        OutStatus = FString::Printf(TEXT("Opened asset: %s"), *ObjectPath);
         return true;
     }
 

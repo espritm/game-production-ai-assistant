@@ -1,3 +1,4 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -6,6 +7,7 @@
 class FGPAASourceOpener
 {
 public:
+    static bool ResolveAssetObjectPath(const FGPAASourceReference& Source, FString& OutPath);
     static bool OpenSource(
         const FGPAASourceReference& Source,
         const FString& ProjectRoot,

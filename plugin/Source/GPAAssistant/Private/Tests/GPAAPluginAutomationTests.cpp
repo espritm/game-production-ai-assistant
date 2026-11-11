@@ -1,55 +1,11 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "Misc/AutomationTest.h"
 
 #include "Models/GPAAApiModels.h"
 #include "Presentation/GPAAKnowledgePresenter.h"
 #include "Services/GPAAChatSettingsValidator.h"
-#include "Services/GPAABackendSupervisor.h"
-#include "Settings/GPAAEditorSettings.h"
-#include "Misc/CommandLine.h"
-#include "Misc/Parse.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
-
-// Opt-in integration test: the runner observes the packaged process while this
-// latent command keeps the editor alive, then verifies shutdown externally.
-DEFINE_LATENT_AUTOMATION_COMMAND_THREE_PARAMETER(FGPAAWaitForBackend, TSharedPtr<bool>, Ready, double, Deadline, FAutomationTestBase*, Test);
-bool FGPAAWaitForBackend::Update()
-{
-    if (FPlatformTime::Seconds() < Deadline) { return false; }
-    Test->TestTrue(TEXT("Backend readiness callback completed successfully before timeout"), *Ready);
-    return true;
-}
-
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGPAAPackagedBackendTest,
-    "GPAA.Plugin.Integration.PackagedBackend",
-    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-
-bool FGPAAPackagedBackendTest::RunTest(const FString& Parameters)
-{
-    FString Url;
-    if (!FParse::Value(FCommandLine::Get(), TEXT("GPAASmokeBackendUrl="), Url))
-    {
-        AddInfo(TEXT("Packaged backend integration requires GPAASmokeBackendUrl; skipped."));
-        return true;
-    }
-    UGPAAEditorSettings* Settings = GetMutableDefault<UGPAAEditorSettings>();
-    Settings->BackendUrl = Url;
-    Settings->BackendExecutablePath.Empty();
-    Settings->BackendLaunchArguments.Empty();
-    Settings->bAutoStartBackend = true;
-    Settings->bStopBackendOnEditorShutdown = true;
-    auto Supervisor = MakeShared<FGPAABackendSupervisor, ESPMode::ThreadSafe>();
-    auto Ready = MakeShared<bool>(false);
-    Supervisor->EnsureBackendReady(*Settings, FGPAARequestCompleted(),
-        FGPAARequestCompleted::CreateLambda([this, Supervisor, Ready](bool bSucceeded, const FString& Message)
-        {
-            *Ready = bSucceeded;
-            TestTrue(TEXT("Packaged backend becomes healthy"), bSucceeded);
-            AddInfo(Message);
-        }));
-    ADD_LATENT_AUTOMATION_COMMAND(FGPAAWaitForBackend(Ready, FPlatformTime::Seconds() + 30.0, this));
-    return true;
-}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FGPAAChatSettingsValidatorTest,

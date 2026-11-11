@@ -1,3 +1,4 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "Services/GPAAChatSettingsValidator.h"
 
 bool FGPAAChatSettingsValidator::Validate(const FGPAAChatSettings& Settings, FString& OutError)

@@ -1,3 +1,4 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "Services/GPAAAssetMetadataRequestBuilder.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS

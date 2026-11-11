@@ -1,12 +1,15 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "UI/SGPAAssistantWidget.h"
 
-#include "Application/GPAAChatSettingsWorkflow.h"
-#include "Application/GPAAProjectWorkflow.h"
+#include "Application/GPAANativeRuntime.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #include "Editor.h"
 #include "ISettingsModule.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SSegmentedControl.h"
+#include "Widgets/Input/SCheckBox.h"
+#include "Styling/AppStyle.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
@@ -50,14 +53,8 @@ namespace
 
 void SGPAAssistantWidget::Construct(const FArguments& InArgs)
 {
-    HttpClient = MakeShared<FGPAAHttpClient>();
-    BackendSupervisor = MakeShared<FGPAABackendSupervisor>();
     InitializeSourceOpenerOptions();
     InitializeChatProviderOptions();
-    SearchResultFilterModes.Add(MakeShared<FString>(SourceFilterAll));
-    SearchResultFilterModes.Add(MakeShared<FString>(SearchResultFilterCode));
-    SearchResultFilterModes.Add(MakeShared<FString>(SearchResultFilterAssets));
-    SelectedSearchResultFilterMode = SearchResultFilterModes[0];
     LoadPluginSettings();
 
     ChildSlot
@@ -65,9 +62,10 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
         SNew(SBorder)
         .Padding(12.0f)
         [
-            SNew(SOverlay)
+            SAssignNew(MainViewSwitcher, SWidgetSwitcher)
+            .WidgetIndex(0)
 
-            + SOverlay::Slot()
+            + SWidgetSwitcher::Slot()
             [
                 SNew(SVerticalBox)
 
@@ -105,42 +103,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .Text(LOCTEXT("OpenSettingsButton", "Settings"))
                             .OnClicked(this, &SGPAAssistantWidget::OnOpenSettingsClicked)
                         ]
-                    ]
-                ]
 
-                + SVerticalBox::Slot()
-                .AutoHeight()
-                .Padding(0.0f, 0.0f, 0.0f, 8.0f)
-                [
-                    SNew(SButton)
-                    .Text(LOCTEXT("RefreshKnowledgeButton", "Refresh Knowledge"))
-                    .OnClicked(this, &SGPAAssistantWidget::OnRefreshKnowledgeClicked)
-                ]
-
-                + SVerticalBox::Slot()
-                .AutoHeight()
-                .Padding(0.0f, 0.0f, 0.0f, 10.0f)
-                [
-                    SNew(SBorder)
-                    .Padding(8.0f)
-                    [
-                        SNew(SVerticalBox)
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
-                        [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("ProjectKnowledgeLabel", "Project Knowledge"))
-                        ]
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        [
-                            SAssignNew(KnowledgeText, STextBlock)
-                            .Text(LOCTEXT("ProjectKnowledgeEmpty", "No local knowledge status loaded."))
-                            .AutoWrapText(true)
-                        ]
                     ]
                 ]
 
@@ -155,23 +118,18 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                 + SVerticalBox::Slot()
                 .AutoHeight()
                 [
-                    SNew(SHorizontalBox)
-
-                    + SHorizontalBox::Slot()
-                    .AutoWidth()
-                    .Padding(0.0f, 0.0f, 8.0f, 0.0f)
+                    SNew(SBox)
+                    .HAlign(HAlign_Left)
                     [
-                        SNew(SButton)
+                        SAssignNew(ViewSelector, SSegmentedControl<int32>)
+                        .Value_Lambda([this]() { return ActiveTabIndex; })
+                        .SupportsMultiSelection(false)
+                        .SupportsEmptySelection(false)
+                        .OnValueChanged(this, &SGPAAssistantWidget::OnViewSelectionChanged)
+                        + SSegmentedControl<int32>::Slot(0)
                         .Text(LOCTEXT("PromptTabButton", "Prompt IA"))
-                        .OnClicked(this, &SGPAAssistantWidget::OnPromptTabClicked)
-                    ]
-
-                    + SHorizontalBox::Slot()
-                    .AutoWidth()
-                    [
-                        SNew(SButton)
+                        + SSegmentedControl<int32>::Slot(1)
                         .Text(LOCTEXT("SearchTabButton", "Search"))
-                        .OnClicked(this, &SGPAAssistantWidget::OnSearchTabClicked)
                     ]
                 ]
 
@@ -193,14 +151,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         SNew(SVerticalBox)
 
                         + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
-                        [
-                            SAssignNew(AnswerSummaryText, STextBlock)
-                            .Text(LOCTEXT("AnswerLabel", "Ask answer"))
-                        ]
-
-                        + SVerticalBox::Slot()
                         .FillHeight(1.0f)
                         .Padding(0.0f, 0.0f, 0.0f, 10.0f)
                         [
@@ -208,14 +158,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .IsReadOnly(true)
                             .AutoWrapText(true)
                             .Text(LOCTEXT("EmptyAnswer", ""))
-                        ]
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
-                        [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("PromptQuestionLabel", "Question"))
                         ]
 
                         + SVerticalBox::Slot()
@@ -228,15 +170,22 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .Padding(0.0f, 0.0f, 8.0f, 0.0f)
                             [
                                 SAssignNew(PromptQuestionTextBox, SEditableTextBox)
-                                .Text(LOCTEXT("QuestionPlaceholder", "Where is stamina regeneration handled?"))
+                                .HintText(LOCTEXT("QuestionPlaceholder", "Prompt your AI here"))
                             ]
 
                             + SHorizontalBox::Slot()
                             .AutoWidth()
                             [
                                 SNew(SButton)
-                                .Text(LOCTEXT("AskButton", "Ask"))
+                                .Text(LOCTEXT("SendButton", "Send"))
                                 .OnClicked(this, &SGPAAssistantWidget::OnAskClicked)
+                            ]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(8,0,0,0)
+                            [
+                                SAssignNew(PromptCancelButton, SButton)
+                                .Text(LOCTEXT("CancelRequestButton", "Cancel"))
+                                .Visibility(this, &SGPAAssistantWidget::GetRequestCancelVisibility, true)
+                                .OnClicked(this, &SGPAAssistantWidget::OnCancelClicked)
                             ]
                         ]
                     ]
@@ -247,10 +196,17 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
 
                         + SVerticalBox::Slot()
                         .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
+                        .Padding(0.0f, 0.0f, 0.0f, 8.0f)
                         [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("SearchQueryLabel", "Search query"))
+                            SNew(SHorizontalBox)
+                            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+                            [SNew(STextBlock).Text(LOCTEXT("SearchScopeLabel", "Search in"))]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(12,0,0,0)
+                            [MakeSearchScopeRadio(LOCTEXT("AssetScope", "Asset"), SearchResultFilterAssets)]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(12,0,0,0)
+                            [MakeSearchScopeRadio(LOCTEXT("CodeScope", "Code"), SearchResultFilterCode)]
+                            + SHorizontalBox::Slot().AutoWidth().Padding(12,0,0,0)
+                            [MakeSearchScopeRadio(LOCTEXT("CombinedScope", "Asset and Code"), SourceFilterAll)]
                         ]
 
                         + SVerticalBox::Slot()
@@ -264,7 +220,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .Padding(0.0f, 0.0f, 8.0f, 0.0f)
                             [
                                 SAssignNew(SearchQueryTextBox, SEditableTextBox)
-                                .Text(LOCTEXT("SearchPlaceholder", "Where is stamina regeneration handled?"))
+                                .HintText(LOCTEXT("SearchPlaceholder", "Search"))
                             ]
 
                             + SHorizontalBox::Slot()
@@ -274,28 +230,12 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                                 .Text(LOCTEXT("SearchButton", "Search"))
                                 .OnClicked(this, &SGPAAssistantWidget::OnSearchClicked)
                             ]
-                        ]
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 4.0f)
-                        [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("SearchFilterLabel", "Filter"))
-                        ]
-
-                        + SVerticalBox::Slot()
-                        .AutoHeight()
-                        .Padding(0.0f, 0.0f, 0.0f, 8.0f)
-                        [
-                            SAssignNew(SearchResultFilterComboBox, SComboBox<TSharedPtr<FString>>)
-                            .OptionsSource(&SearchResultFilterModes)
-                            .InitiallySelectedItem(SelectedSearchResultFilterMode)
-                            .OnSelectionChanged(this, &SGPAAssistantWidget::OnSearchResultFilterChanged)
-                            .OnGenerateWidget(this, &SGPAAssistantWidget::GenerateSearchResultFilterWidget)
+                            + SHorizontalBox::Slot().AutoWidth().Padding(8,0,0,0)
                             [
-                                SNew(STextBlock)
-                                .Text(this, &SGPAAssistantWidget::GetSelectedSearchResultFilterText)
+                                SAssignNew(SearchCancelButton, SButton)
+                                .Text(LOCTEXT("CancelRequestButton", "Cancel"))
+                                .Visibility(this, &SGPAAssistantWidget::GetRequestCancelVisibility, false)
+                                .OnClicked(this, &SGPAAssistantWidget::OnCancelClicked)
                             ]
                         ]
 
@@ -319,12 +259,9 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                 ]
             ]
 
-            + SOverlay::Slot()
-            .HAlign(HAlign_Fill)
-            .VAlign(VAlign_Fill)
+            + SWidgetSwitcher::Slot()
             [
                 SNew(SBorder)
-                .Visibility(this, &SGPAAssistantWidget::GetHistoryVisibility)
                 .Padding(12.0f)
                 [
                     SNew(SVerticalBox)
@@ -347,7 +284,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         .AutoWidth()
                         [
                             SNew(SButton)
-                            .Text(LOCTEXT("CloseHistoryButton", "X"))
+                            .Text(LOCTEXT("CloseHistoryButton", "Back"))
                             .OnClicked(this, &SGPAAssistantWidget::OnCloseHistoryClicked)
                         ]
                     ]
@@ -365,8 +302,8 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
         ]
     ];
 
-    LoadChatSettingsFromBackend();
-    LoadKnowledgeStatus();
+    AnswerTextBox->SetVAlign(VAlign_Bottom);
+    LoadChatSettings();
 }
 
 FReply SGPAAssistantWidget::OnOpenSettingsClicked()
@@ -386,139 +323,100 @@ FReply SGPAAssistantWidget::OnOpenSettingsClicked()
 FReply SGPAAssistantWidget::OnLoadChatSettingsClicked()
 {
     SetBusy(TEXT("Loading chat settings..."));
-    LoadChatSettingsFromBackend();
+    LoadChatSettings();
     return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnSaveChatSettingsClicked()
 {
     SetBusy(FString::Printf(TEXT("Saving chat settings for %s..."), *GetSelectedChatProviderName()));
-    SaveChatSettingsToBackend();
-    return FReply::Handled();
-}
-
-FReply SGPAAssistantWidget::OnRefreshKnowledgeClicked()
-{
-    SetBusy(TEXT("Refreshing project knowledge..."));
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        FGPAAProjectWorkflow::RefreshKnowledge(
-            HttpClient,
-            GetBackendUrl(),
-            GetProjectRoot(),
-            BuildAssetMetadataSyncRequest(),
-            FGPAAWorkflowStatusChanged::CreateSP(this, &SGPAAssistantWidget::SetBusy),
-            FGPAAIndexUpdated::CreateSP(this, &SGPAAssistantWidget::UpdateKnowledgeSummary),
-            FGPAARequestCompleted::CreateLambda([this](bool bSucceeded, const FString& Message)
-            {
-                SetResult(bSucceeded, Message);
-                if (bSucceeded)
-                {
-                    LoadKnowledgeStatus();
-                }
-            }));
-    });
+    SaveChatSettings();
     return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnHistoryClicked()
 {
-    SetBusy(TEXT("Loading local chat history..."));
-    bHistoryVisible = true;
-
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        HttpClient->GetChatHistory(
-            GetBackendUrl(),
-            GetProjectRoot(),
-            FGPAARequestCompleted::CreateSP(this, &SGPAAssistantWidget::SetHistoryResult));
-    });
-
+    MainViewSwitcher->SetActiveWidgetIndex(1);
+    HistoryTextBox->SetText(FText::FromString(TEXT("Loading local history...")));
+    TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
+    FGPAANativeRuntime::Get()->LoadHistory(GetProjectRoot(), [Weak](bool Ok, const FString& Message)
+    { if (auto Widget = Weak.Pin()) Widget->SetHistoryResult(Ok, Message); });
     return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnCloseHistoryClicked()
 {
-    bHistoryVisible = false;
+    MainViewSwitcher->SetActiveWidgetIndex(0);
     return FReply::Handled();
+}
+
+void SGPAAssistantWidget::OnViewSelectionChanged(int32 Index)
+{
+    if (Index != 0 && Index != 1) return;
+    ActiveTabIndex = Index;
+    if (TabSwitcher.IsValid()) TabSwitcher->SetActiveWidgetIndex(Index);
 }
 
 FReply SGPAAssistantWidget::OnPromptTabClicked()
 {
-    ActiveTabIndex = 0;
-    if (TabSwitcher.IsValid())
-    {
-        TabSwitcher->SetActiveWidgetIndex(ActiveTabIndex);
-    }
-
+    OnViewSelectionChanged(0);
     return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnSearchTabClicked()
 {
-    ActiveTabIndex = 1;
-    if (TabSwitcher.IsValid())
-    {
-        TabSwitcher->SetActiveWidgetIndex(ActiveTabIndex);
-    }
-
+    OnViewSelectionChanged(1);
     return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnSearchClicked()
 {
-    SetBusy(TEXT("Preparing project search..."));
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        FGPAAProjectWorkflow::Search(
-            HttpClient,
-            GetBackendUrl(),
-            GetProjectRoot(),
-            BuildAssetMetadataSyncRequest(),
-            GetSearchQuery(),
-            GetSelectedSourceFilterName(),
-            FGPAAWorkflowStatusChanged::CreateSP(this, &SGPAAssistantWidget::SetBusy),
-            FGPAAIndexUpdated::CreateSP(this, &SGPAAssistantWidget::UpdateKnowledgeSummary),
-            FGPAASearchCompleted::CreateSP(this, &SGPAAssistantWidget::SetSearchResult));
-    });
-
-    return FReply::Handled();
+    StartNative(false); return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnAskClicked()
 {
-    SetBusy(FString::Printf(TEXT("Preparing %s request..."), *GetSelectedChatProviderName()));
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        SetBusy(FString::Printf(TEXT("Saving %s settings..."), *GetSelectedChatProviderName()));
-        FGPAAChatSettingsWorkflow::Save(
-            HttpClient,
-            GetBackendUrl(),
-            GetChatSettingsFromUi(),
-            FGPAARequestCompleted::CreateLambda([this](bool bSucceeded, const FString& Message)
-            {
-                if (!bSucceeded)
-                {
-                    SetResult(false, Message);
-                    return;
-                }
+    StartNative(true); return FReply::Handled();
+}
 
-                ApplyChatSettingsResponse(true, Message);
-                SetBusy(FString::Printf(TEXT("Preparing %s request..."), *GetSelectedChatProviderName()));
-                FGPAAProjectWorkflow::Ask(
-                    HttpClient,
-                    GetBackendUrl(),
-                    GetProjectRoot(),
-                    BuildAssetMetadataSyncRequest(),
-                    GetPromptQuestion(),
-                    GetSelectedSourceFilterName(),
-                    GetSelectedChatProviderName(),
-                    FGPAAWorkflowStatusChanged::CreateSP(this, &SGPAAssistantWidget::SetBusy),
-                    FGPAAIndexUpdated::CreateSP(this, &SGPAAssistantWidget::UpdateKnowledgeSummary),
-                    FGPAAChatCompleted::CreateSP(this, &SGPAAssistantWidget::SetChatResult));
-            }));
-    });
+SGPAAssistantWidget::~SGPAAssistantWidget()
+{
+    if (bBusy) FGPAANativeRuntime::CancelIfRunning();
+}
+
+FReply SGPAAssistantWidget::OnCancelClicked()
+{
+    if (!bCancellable) return FReply::Handled();
+    NativeRequestId = FGuid::NewGuid();
+    FGPAANativeRuntime::CancelIfRunning(); StopBusy();
+    StatusText->SetText(FText::FromString(TEXT("Operation cancelled. Any partial response is kept in local history.")));
     return FReply::Handled();
+}
+
+void SGPAAssistantWidget::StartNative(bool Ask)
+{
+    LoadPluginSettings();
+    const FString Query = Ask ? GetPromptQuestion() : GetSearchQuery();
+    if (Query.TrimStartAndEnd().IsEmpty()) { SetResult(false, TEXT("Enter a question or search query first.")); return; }
+    NativeRequestId = FGuid::NewGuid(); const FGuid RequestId = NativeRequestId;
+    TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
+    bCancellable = true;
+    bRequestIsAsk = Ask;
+    NativeAnswer.Reset(); SetBusy(TEXT("Preparing local project knowledge..."));
+    if (Ask) SetAnswerText(TEXT(""));
+    FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, false,
+        [Weak, RequestId](const FString& Message) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) W->SetBusy(Message); },
+        [Weak, RequestId](const FString& Delta) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) { W->NativeAnswer += Delta; W->SetAnswerText(W->NativeAnswer); } },
+        [Weak, RequestId, Ask](bool Ok, const FString& Message, const FGPAANativeResult& Result)
+        {
+            auto W = Weak.Pin(); if (!W || W->NativeRequestId != RequestId) return;
+            if (Ask)
+            {
+                W->SetChatResult(Ok, Message, Result.Answer, Result.Sources);
+                if (!Ok && !Result.Answer.IsEmpty()) W->SetAnswerText(Result.Answer + TEXT("\n\n[Interrupted] ") + Message);
+            }
+            else W->SetSearchResult(Ok, Message, Result.Sources);
+        }, Ask ? SourceFilterAll : GetSelectedSourceFilterName());
 }
 
 FString SGPAAssistantWidget::BuildAssetMetadataSyncRequest() const
@@ -546,14 +444,13 @@ void SGPAAssistantWidget::SetBusyFromWorkflow(bool bSucceeded, const FString& Me
 void SGPAAssistantWidget::SetResult(bool bSucceeded, const FString& Message)
 {
     StopBusy();
-    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Done") : TEXT("Error")));
-    AnswerTextBox->SetText(FText::FromString(Message));
+    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Ready") : TEXT("Error")));
+    SetAnswerText(Message);
 }
 
 void SGPAAssistantWidget::SetHistoryResult(bool bSucceeded, const FString& Message)
 {
-    StopBusy();
-    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("History loaded") : TEXT("Error")));
+    if (!bCancellable) StatusText->SetText(FText::FromString(bSucceeded ? TEXT("History loaded") : TEXT("Error")));
     if (HistoryTextBox.IsValid())
     {
         HistoryTextBox->SetText(FText::FromString(Message));
@@ -579,14 +476,19 @@ void SGPAAssistantWidget::SetSearchResult(bool bSucceeded, const FString& Messag
     RefreshSourceLists();
 }
 
+void SGPAAssistantWidget::SetAnswerText(const FString& Text)
+{
+    AnswerTextBox->SetText(FText::FromString(Text));
+    AnswerTextBox->ScrollTo(ETextLocation::EndOfDocument);
+}
+
 void SGPAAssistantWidget::SetChatResult(bool bSucceeded, const FString& Message, const FString& Answer, const TArray<FGPAASourceReference>& Sources)
 {
     StopBusy();
     StatusText->SetText(FText::FromString(bSucceeded
         ? FString::Printf(TEXT("Answer complete via %s"), *GetSelectedChatProviderName())
         : TEXT("Error")));
-    AnswerSummaryText->SetText(FText::FromString(Message));
-    AnswerTextBox->SetText(FText::FromString(bSucceeded ? Answer : Message));
+    SetAnswerText(bSucceeded ? Answer : Message);
 
     AnswerSources.Reset();
     if (bSucceeded)
@@ -613,9 +515,15 @@ EActiveTimerReturnType SGPAAssistantWidget::HandleBusyTick(double InCurrentTime,
     return EActiveTimerReturnType::Continue;
 }
 
+EVisibility SGPAAssistantWidget::GetRequestCancelVisibility(bool ForAsk) const
+{
+    return bCancellable && bBusy && bRequestIsAsk == ForAsk ? EVisibility::Visible : EVisibility::Collapsed;
+}
+
 void SGPAAssistantWidget::StopBusy()
 {
     bBusy = false;
+    bCancellable = false;
 }
 
 TSharedRef<ITableRow> SGPAAssistantWidget::GenerateSourceRow(TSharedPtr<FGPAASourceReference> Item, const TSharedRef<STableViewBase>& OwnerTable)
@@ -699,10 +607,9 @@ void SGPAAssistantWidget::InitializeSourceOpenerOptions()
 void SGPAAssistantWidget::InitializeChatProviderOptions()
 {
     ChatProviderModes.Reset();
-    ChatProviderModes.Add(MakeShared<FString>(ChatProviderOllama));
+    ChatProviderModes.Add(MakeShared<FString>(TEXT("OpenAI")));
     ChatProviderModes.Add(MakeShared<FString>(ChatProviderOpenAICompatible));
-    ChatProviderModes.Add(MakeShared<FString>(ChatProviderEcho));
-    SelectedChatProviderMode = ChatProviderModes[0];
+    SelectedChatProviderMode=ChatProviderModes[0];
 }
 
 void SGPAAssistantWidget::LoadPluginSettings()
@@ -750,66 +657,15 @@ void SGPAAssistantWidget::SavePluginSettings() const
     Settings->SaveConfig();
 }
 
-void SGPAAssistantWidget::EnsureBackendReady(const FString& BusyMessage, TFunction<void()> OnReady)
+
+void SGPAAssistantWidget::LoadChatSettings()
 {
-    if (!BackendSupervisor.IsValid())
-    {
-        SetResult(false, TEXT("The local backend supervisor is unavailable."));
-        return;
-    }
-
-    BackendSupervisor->EnsureBackendReady(
-        *GetDefault<UGPAAEditorSettings>(),
-        FGPAARequestCompleted::CreateLambda([this, BusyMessage](bool bSucceeded, const FString& Message)
-        {
-            SetBusy(bSucceeded ? Message : BusyMessage);
-        }),
-        FGPAARequestCompleted::CreateLambda([this, OnReady](bool bSucceeded, const FString& Message)
-        {
-            if (!bSucceeded)
-            {
-                SetResult(false, Message);
-                return;
-            }
-
-            OnReady();
-        }));
+    LoadPluginSettings(); SetResult(true, TEXT("Provider settings loaded locally."));
 }
 
-void SGPAAssistantWidget::LoadChatSettingsFromBackend()
+void SGPAAssistantWidget::SaveChatSettings()
 {
-    if (!HttpClient.IsValid())
-    {
-        return;
-    }
-
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        HttpClient->GetChatSettings(
-            GetBackendUrl(),
-            FGPAARequestCompleted::CreateSP(this, &SGPAAssistantWidget::ApplyChatSettingsResponse));
-    });
-}
-
-void SGPAAssistantWidget::SaveChatSettingsToBackend()
-{
-    if (!HttpClient.IsValid())
-    {
-        return;
-    }
-
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        FGPAAChatSettingsWorkflow::Save(
-            HttpClient,
-            GetBackendUrl(),
-            GetChatSettingsFromUi(),
-            FGPAARequestCompleted::CreateLambda([this](bool bSucceeded, const FString& Message)
-            {
-                ApplyChatSettingsResponse(bSucceeded, Message);
-                SetResult(bSucceeded, bSucceeded ? TEXT("Chat settings saved.") : Message);
-            }));
-    });
+    SavePluginSettings(); SetResult(true, TEXT("Provider settings saved. Personal keys are managed in Settings."));
 }
 
 void SGPAAssistantWidget::ApplyChatSettingsResponse(bool bSucceeded, const FString& Message)
@@ -849,67 +705,6 @@ void SGPAAssistantWidget::ApplyChatSettingsResponse(bool bSucceeded, const FStri
     }
 }
 
-void SGPAAssistantWidget::LoadKnowledgeStatus()
-{
-    if (!HttpClient.IsValid())
-    {
-        return;
-    }
-
-    EnsureBackendReady(TEXT("Starting local backend..."), [this]()
-    {
-        HttpClient->GetKnowledgeStatus(
-            GetBackendUrl(),
-            GetProjectRoot(),
-            FGPAARequestCompleted::CreateSP(this, &SGPAAssistantWidget::ApplyKnowledgeStatusResponse));
-    });
-}
-
-void SGPAAssistantWidget::ApplyKnowledgeStatusResponse(bool bSucceeded, const FString& Message)
-{
-    if (!KnowledgeText.IsValid())
-    {
-        return;
-    }
-
-    if (!bSucceeded)
-    {
-        KnowledgeText->SetText(FText::FromString(TEXT("Project knowledge status unavailable.")));
-        return;
-    }
-
-    FGPAAKnowledgeStatus Status;
-    if (!FGPAAApiModels::ParseKnowledgeStatus(Message, Status))
-    {
-        KnowledgeText->SetText(FText::FromString(TEXT("Invalid project knowledge response.")));
-        return;
-    }
-
-    KnowledgeText->SetText(FText::FromString(FGPAAKnowledgePresenter::FormatKnowledgeStatus(Status)));
-}
-
-void SGPAAssistantWidget::UpdateKnowledgeSummaryFromIndexResponse(const FString& Message)
-{
-    if (!KnowledgeText.IsValid())
-    {
-        return;
-    }
-
-    FGPAAIndexStatistics Statistics;
-    if (FGPAAApiModels::ParseIndexStatisticsResponse(Message, Statistics))
-    {
-        UpdateKnowledgeSummary(Statistics);
-    }
-}
-
-void SGPAAssistantWidget::UpdateKnowledgeSummary(const FGPAAIndexStatistics& Statistics)
-{
-    if (KnowledgeText.IsValid())
-    {
-        KnowledgeText->SetText(FText::FromString(FGPAAKnowledgePresenter::FormatIndexSummary(Statistics)));
-    }
-}
-
 FGPAAChatSettings SGPAAssistantWidget::GetChatSettingsFromUi() const
 {
     return GetDefault<UGPAAEditorSettings>()->ToChatSettings();
@@ -937,13 +732,22 @@ void SGPAAssistantWidget::OnChatProviderChanged(TSharedPtr<FString> NewSelection
     }
 }
 
-void SGPAAssistantWidget::OnSearchResultFilterChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo)
+TSharedRef<SWidget> SGPAAssistantWidget::MakeSearchScopeRadio(const FText& Label, const FString& Scope)
 {
-    if (NewSelection.IsValid())
-    {
-        SelectedSearchResultFilterMode = NewSelection;
-    }
-
+    return SNew(SCheckBox)
+        .Style(FAppStyle::Get(), "RadioButton")
+        .IsChecked(this, &SGPAAssistantWidget::GetSearchScopeCheckState, Scope)
+        .OnCheckStateChanged(this, &SGPAAssistantWidget::OnSearchScopeChanged, Scope)
+        [SNew(STextBlock).Text(Label)];
+}
+ECheckBoxState SGPAAssistantWidget::GetSearchScopeCheckState(FString Scope) const
+{
+    return SelectedSearchScope == Scope ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+}
+void SGPAAssistantWidget::OnSearchScopeChanged(ECheckBoxState State, FString Scope)
+{
+    if (State != ECheckBoxState::Checked) return;
+    SelectedSearchScope = Scope;
     RebuildFilteredSearchResults();
     RefreshSourceLists();
 }
@@ -966,12 +770,6 @@ TSharedRef<SWidget> SGPAAssistantWidget::GenerateChatProviderWidget(TSharedPtr<F
         .Text(FText::FromString(Item.IsValid() ? *Item : ChatProviderOllama));
 }
 
-TSharedRef<SWidget> SGPAAssistantWidget::GenerateSearchResultFilterWidget(TSharedPtr<FString> Item) const
-{
-    return SNew(STextBlock)
-        .Text(FText::FromString(Item.IsValid() ? *Item : SourceFilterAll));
-}
-
 FText SGPAAssistantWidget::GetSelectedSourceOpenerModeText() const
 {
     return FText::FromString(SelectedSourceOpenerMode.IsValid() ? *SelectedSourceOpenerMode : SourceOpenerAuto);
@@ -982,28 +780,10 @@ FText SGPAAssistantWidget::GetSelectedChatProviderText() const
     return FText::FromString(SelectedChatProviderMode.IsValid() ? *SelectedChatProviderMode : ChatProviderOllama);
 }
 
-FText SGPAAssistantWidget::GetSelectedSearchResultFilterText() const
-{
-    return FText::FromString(SelectedSearchResultFilterMode.IsValid() ? *SelectedSearchResultFilterMode : SourceFilterAll);
-}
-
 FText SGPAAssistantWidget::GetSettingsSummaryText() const
 {
-    const UGPAAEditorSettings* Settings = GetDefault<UGPAAEditorSettings>();
-    const FString Model = Settings->ChatProvider.Equals(ChatProviderOpenAICompatible, ESearchCase::IgnoreCase)
-        ? Settings->OpenAIModel
-        : Settings->ChatProvider;
-
-    return FText::FromString(FString::Printf(
-        TEXT("Provider: %s | Backend: %s | Source opener: %s"),
-        *Model,
-        *Settings->BackendUrl,
-        *Settings->SourceOpenerMode));
-}
-
-EVisibility SGPAAssistantWidget::GetHistoryVisibility() const
-{
-    return bHistoryVisible ? EVisibility::Visible : EVisibility::Collapsed;
+    const auto* Settings=GetDefault<UGPAAEditorSettings>();
+    return FText::FromString(FString::Printf(TEXT("Provider: %s | Model: %s | Search: local"),*Settings->ChatProvider,*Settings->OpenAIModel));
 }
 
 EVisibility SGPAAssistantWidget::GetCustomSourceOpenerVisibility() const
@@ -1020,10 +800,6 @@ EVisibility SGPAAssistantWidget::GetOpenAICompatibleSettingsVisibility() const
         : EVisibility::Collapsed;
 }
 
-FString SGPAAssistantWidget::GetBackendUrl() const
-{
-    return GetDefault<UGPAAEditorSettings>()->BackendUrl;
-}
 
 FString SGPAAssistantWidget::GetProjectRoot() const
 {
@@ -1047,7 +823,7 @@ FString SGPAAssistantWidget::GetSelectedChatProviderName() const
 
 FString SGPAAssistantWidget::GetSelectedSourceFilterName() const
 {
-    return SourceFilterAll;
+    return SelectedSearchScope;
 }
 
 FString SGPAAssistantWidget::GetSourceOpenerCommand() const
@@ -1059,9 +835,7 @@ void SGPAAssistantWidget::RebuildFilteredSearchResults()
 {
     FilteredSearchResults.Reset();
 
-    const FString Filter = SelectedSearchResultFilterMode.IsValid()
-        ? *SelectedSearchResultFilterMode
-        : SourceFilterAll;
+    const FString& Filter = SelectedSearchScope;
 
     for (const TSharedPtr<FGPAASourceReference>& Result : SearchResults)
     {

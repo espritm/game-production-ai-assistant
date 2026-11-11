@@ -11,3 +11,5 @@ plugin/Intermediate/
 plugin/Saved/
 plugin/Resources/Backend/*
 !plugin/Resources/Backend/.gitkeep
+plugin/Source/ThirdParty/OnnxRuntime/
+plugin/Source/ThirdParty/MiniLM/

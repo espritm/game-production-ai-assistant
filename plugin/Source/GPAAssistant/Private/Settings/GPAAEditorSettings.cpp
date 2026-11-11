@@ -1,379 +1,158 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "Settings/GPAAEditorSettings.h"
-
+#include "Application/GPAANativeRuntime.h"
+#include "Infrastructure/GPAANativeStorage.h"
+#include "DesktopPlatformModule.h"
+#include "IDesktopPlatform.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Misc/App.h"
 #include "Dom/JsonObject.h"
-#include "HttpModule.h"
-#include "Interfaces/IHttpResponse.h"
-#include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
-#include "Misc/MessageDialog.h"
 #include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 #include "Serialization/JsonSerializer.h"
-#include "Serialization/JsonWriter.h"
-#include "Services/GPAABackendSupervisor.h"
-
-namespace
-{
-    const TCHAR* DefaultBackendUrl = TEXT("http://localhost:5000");
-    const TCHAR* DefaultChatProvider = TEXT("Ollama");
-    const TCHAR* DefaultOpenAIBaseUrl = TEXT("https://api.openai.com/v1");
-    const TCHAR* DefaultOpenAIModel = TEXT("gpt-4.1-mini");
-    const TCHAR* DefaultOpenAIEnvironmentVariable = TEXT("OPENAI_API_KEY");
-    const TCHAR* DefaultSourceOpenerMode = TEXT("Auto");
-    const TCHAR* DefaultCustomSourceOpenerCommand = TEXT("code -g \"{file}:{line}\"");
-    FString ReadString(const TSharedPtr<FJsonObject>& JsonObject, const TCHAR* FieldName, const FString& DefaultValue)
-    {
-        FString Value;
-        return JsonObject->TryGetStringField(FieldName, Value) ? Value : DefaultValue;
-    }
-
-    int32 ReadInt(const TSharedPtr<FJsonObject>& JsonObject, const TCHAR* FieldName, int32 DefaultValue)
-    {
-        double Value = 0.0;
-        return JsonObject->TryGetNumberField(FieldName, Value) ? static_cast<int32>(Value) : DefaultValue;
-    }
-
-    float ReadFloat(const TSharedPtr<FJsonObject>& JsonObject, const TCHAR* FieldName, float DefaultValue)
-    {
-        double Value = 0.0;
-        return JsonObject->TryGetNumberField(FieldName, Value) ? static_cast<float>(Value) : DefaultValue;
-    }
-
-    FString NormalizeBackendUrl(const FString& BackendUrl)
-    {
-        FString Normalized = BackendUrl.TrimStartAndEnd();
-        while (Normalized.EndsWith(TEXT("/")))
-        {
-            Normalized.LeftChopInline(1);
-        }
-
-        return Normalized.IsEmpty() ? DefaultBackendUrl : Normalized;
-    }
-
-    void SendSettingsJsonRequest(
-        const FString& Url,
-        const FString& Verb,
-        const FString& Body,
-        TFunction<void(bool, const FString&)> OnCompleted)
-    {
-        TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
-        Request->SetURL(Url);
-        Request->SetVerb(Verb);
-        Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-        Request->SetTimeout(120.0f);
-        if (!Body.IsEmpty())
-        {
-            Request->SetContentAsString(Body);
-        }
-
-        Request->OnProcessRequestComplete().BindLambda([OnCompleted](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
-        {
-            if (!bWasSuccessful || !Response.IsValid())
-            {
-                OnCompleted(false, TEXT("The local backend did not respond."));
-                return;
-            }
-
-            const int32 StatusCode = Response->GetResponseCode();
-            const FString ResponseBody = Response->GetContentAsString();
-            if (StatusCode < 200 || StatusCode >= 300)
-            {
-                OnCompleted(false, FGPAAApiModels::FormatHttpError(StatusCode, ResponseBody));
-                return;
-            }
-
-            OnCompleted(true, ResponseBody);
-        });
-
-        if (!Request->ProcessRequest())
-        {
-            OnCompleted(false, FString::Printf(TEXT("Could not send request to %s."), *Url));
-        }
-    }
-
-    void StoreAndShowDiagnostics(UGPAAEditorSettings* Settings, const FString& Message)
-    {
-        if (!Settings)
-        {
-            return;
-        }
-
-        Settings->LastDiagnosticsResult = Message;
-        FMessageDialog::Open(
-            EAppMsgType::Ok,
-            FText::FromString(Message),
-            FText::FromString(TEXT("Game Production AI Assistant")));
-    }
-}
 
 UGPAAEditorSettings::UGPAAEditorSettings()
 {
-    BackendUrl = DefaultBackendUrl;
-    bAutoStartBackend = true;
-    bStopBackendOnEditorShutdown = true;
-    BackendExecutablePath = FString();
-    BackendLaunchArguments = FString();
-    ChatProvider = DefaultChatProvider;
-    OpenAIBaseUrl = DefaultOpenAIBaseUrl;
-    OpenAIModel = DefaultOpenAIModel;
-    OpenAIApiKeyEnvironmentVariable = DefaultOpenAIEnvironmentVariable;
-    TimeoutSeconds = 120;
-    MaxOutputTokens = 512;
-    Temperature = 0.2f;
-    SourceOpenerMode = DefaultSourceOpenerMode;
-    CustomSourceOpenerCommand = DefaultCustomSourceOpenerCommand;
-    bIncludeSecretsInExport = false;
+    ChatProvider = TEXT("OpenAI");
+    OpenAIBaseUrl = TEXT("https://api.openai.com/v1");
+    OpenAIModel = TEXT("gpt-4.1-mini");
+    SourceOpenerMode = TEXT("Auto");
+    CustomSourceOpenerCommand = TEXT("code -g \"{file}:{line}\"");
 }
-
-void UGPAAEditorSettings::CheckBackend()
-{
-    LastDiagnosticsResult = TEXT("Checking backend...");
-    TWeakObjectPtr<UGPAAEditorSettings> WeakThis(this);
-    const TSharedRef<FGPAABackendSupervisor, ESPMode::ThreadSafe> Supervisor = MakeShared<FGPAABackendSupervisor>();
-
-    Supervisor->EnsureBackendReady(
-        *this,
-        FGPAARequestCompleted::CreateLambda([WeakThis](bool, const FString& Message)
-        {
-            if (WeakThis.IsValid())
-            {
-                WeakThis->LastDiagnosticsResult = Message;
-            }
-        }),
-        FGPAARequestCompleted::CreateLambda([WeakThis, Supervisor](bool bReady, const FString& ReadyMessage)
-        {
-            if (!WeakThis.IsValid())
-            {
-                return;
-            }
-
-            if (!bReady)
-            {
-                StoreAndShowDiagnostics(WeakThis.Get(), ReadyMessage);
-                return;
-            }
-
-            const FString Url = NormalizeBackendUrl(WeakThis->BackendUrl) + TEXT("/runtime/status");
-            SendSettingsJsonRequest(Url, TEXT("GET"), FString(), [WeakThis, Supervisor](bool bSucceeded, const FString& Message)
-            {
-                if (!WeakThis.IsValid())
-                {
-                    return;
-                }
-
-                StoreAndShowDiagnostics(WeakThis.Get(), bSucceeded
-                    ? FString::Printf(TEXT("Backend OK: %s"), *Message)
-                    : Message);
-            });
-        }));
-}
-
-void UGPAAEditorSettings::TestPromptIA()
-{
-    LastDiagnosticsResult = TEXT("Saving chat settings...");
-    TWeakObjectPtr<UGPAAEditorSettings> WeakThis(this);
-    const TSharedRef<FGPAABackendSupervisor, ESPMode::ThreadSafe> Supervisor = MakeShared<FGPAABackendSupervisor>();
-
-    Supervisor->EnsureBackendReady(
-        *this,
-        FGPAARequestCompleted::CreateLambda([WeakThis](bool, const FString& Message)
-        {
-            if (WeakThis.IsValid())
-            {
-                WeakThis->LastDiagnosticsResult = Message;
-            }
-        }),
-        FGPAARequestCompleted::CreateLambda([WeakThis, Supervisor](bool bReady, const FString& ReadyMessage)
-        {
-            if (!WeakThis.IsValid())
-            {
-                return;
-            }
-
-            if (!bReady)
-            {
-                StoreAndShowDiagnostics(WeakThis.Get(), ReadyMessage);
-                return;
-            }
-
-            const FString BaseUrl = NormalizeBackendUrl(WeakThis->BackendUrl);
-            const FString SettingsBody = FGPAAApiModels::SerializeChatSettings(WeakThis->ToChatSettings());
-            SendSettingsJsonRequest(
-                BaseUrl + TEXT("/runtime/chat-settings"),
-                TEXT("POST"),
-                SettingsBody,
-                [WeakThis, BaseUrl, Supervisor](bool bSettingsSaved, const FString& SettingsMessage)
-                {
-                    if (!WeakThis.IsValid())
-                    {
-                        return;
-                    }
-
-                    if (!bSettingsSaved)
-                    {
-                        StoreAndShowDiagnostics(WeakThis.Get(), SettingsMessage);
-                        return;
-                    }
-
-                    WeakThis->LastDiagnosticsResult = TEXT("Testing Prompt IA provider...");
-                    SendSettingsJsonRequest(
-                        BaseUrl + TEXT("/runtime/chat-provider/test"),
-                        TEXT("POST"),
-                        TEXT("{}"),
-                        [WeakThis, Supervisor](bool bTestSucceeded, const FString& TestMessage)
-                        {
-                            if (!WeakThis.IsValid())
-                            {
-                                return;
-                            }
-
-                            if (!bTestSucceeded)
-                            {
-                                StoreAndShowDiagnostics(WeakThis.Get(), TestMessage);
-                                return;
-                            }
-
-                            FGPAAChatProviderTestResult Result;
-                            if (FGPAAApiModels::ParseChatProviderTestResult(TestMessage, Result))
-                            {
-                                StoreAndShowDiagnostics(WeakThis.Get(), FString::Printf(
-                                    TEXT("%s (%s) is ready. %s"),
-                                    *Result.Provider,
-                                    Result.Model.IsEmpty() ? TEXT("default model") : *Result.Model,
-                                    *Result.Message));
-                                return;
-                            }
-
-                            StoreAndShowDiagnostics(WeakThis.Get(), TEXT("Prompt IA provider responded."));
-                        });
-                });
-        }));
-}
-
-void UGPAAEditorSettings::ExportSettingsProfile()
-{
-    const FString ProfilePath = ResolveProfilePath(ExportProfilePath, TEXT("GPAASettingsProfile.json"));
-    IFileManager::Get().MakeDirectory(*FPaths::GetPath(ProfilePath), true);
-    TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
-
-    JsonObject->SetStringField(TEXT("backendUrl"), BackendUrl);
-    JsonObject->SetBoolField(TEXT("autoStartBackend"), bAutoStartBackend);
-    JsonObject->SetBoolField(TEXT("stopBackendOnEditorShutdown"), bStopBackendOnEditorShutdown);
-    JsonObject->SetStringField(TEXT("backendProjectPath"), BackendProjectPath);
-    JsonObject->SetStringField(TEXT("backendExecutablePath"), BackendExecutablePath);
-    JsonObject->SetStringField(TEXT("backendLaunchArguments"), BackendLaunchArguments);
-    JsonObject->SetStringField(TEXT("projectRootOverride"), ProjectRootOverride);
-    JsonObject->SetStringField(TEXT("chatProvider"), ChatProvider);
-    JsonObject->SetStringField(TEXT("openAIBaseUrl"), OpenAIBaseUrl);
-    JsonObject->SetStringField(TEXT("openAIModel"), OpenAIModel);
-    JsonObject->SetStringField(TEXT("openAIApiKeyEnvironmentVariable"), OpenAIApiKeyEnvironmentVariable);
-    JsonObject->SetNumberField(TEXT("timeoutSeconds"), TimeoutSeconds);
-    JsonObject->SetNumberField(TEXT("maxOutputTokens"), MaxOutputTokens);
-    JsonObject->SetNumberField(TEXT("temperature"), Temperature);
-    JsonObject->SetStringField(TEXT("sourceOpenerMode"), SourceOpenerMode);
-    JsonObject->SetStringField(TEXT("customSourceOpenerCommand"), CustomSourceOpenerCommand);
-    JsonObject->SetBoolField(TEXT("includesSecrets"), bIncludeSecretsInExport);
-
-    if (bIncludeSecretsInExport)
-    {
-        JsonObject->SetStringField(TEXT("openAIApiKey"), OpenAIApiKey);
-    }
-
-    FString Output;
-    const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Output);
-    FJsonSerializer::Serialize(JsonObject, Writer);
-    FFileHelper::SaveStringToFile(Output, *ProfilePath);
-}
-
-void UGPAAEditorSettings::ImportSettingsProfile()
-{
-    const FString ProfilePath = ResolveProfilePath(ImportProfilePath, TEXT("GPAASettingsProfile.json"));
-    FString Input;
-    if (!FFileHelper::LoadFileToString(Input, *ProfilePath))
-    {
-        return;
-    }
-
-    TSharedPtr<FJsonObject> JsonObject;
-    const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Input);
-    if (!FJsonSerializer::Deserialize(Reader, JsonObject) || !JsonObject.IsValid())
-    {
-        return;
-    }
-
-    BackendUrl = ReadString(JsonObject, TEXT("backendUrl"), BackendUrl);
-    bool bImportedAutoStart = bAutoStartBackend;
-    if (JsonObject->TryGetBoolField(TEXT("autoStartBackend"), bImportedAutoStart))
-    {
-        bAutoStartBackend = bImportedAutoStart;
-    }
-    bool bImportedStopBackend = bStopBackendOnEditorShutdown;
-    if (JsonObject->TryGetBoolField(TEXT("stopBackendOnEditorShutdown"), bImportedStopBackend))
-    {
-        bStopBackendOnEditorShutdown = bImportedStopBackend;
-    }
-    BackendProjectPath = ReadString(JsonObject, TEXT("backendProjectPath"), BackendProjectPath);
-    BackendExecutablePath = ReadString(JsonObject, TEXT("backendExecutablePath"), BackendExecutablePath);
-    BackendLaunchArguments = ReadString(JsonObject, TEXT("backendLaunchArguments"), BackendLaunchArguments);
-    ProjectRootOverride = ReadString(JsonObject, TEXT("projectRootOverride"), ProjectRootOverride);
-    ChatProvider = ReadString(JsonObject, TEXT("chatProvider"), ChatProvider);
-    OpenAIBaseUrl = ReadString(JsonObject, TEXT("openAIBaseUrl"), OpenAIBaseUrl);
-    OpenAIModel = ReadString(JsonObject, TEXT("openAIModel"), OpenAIModel);
-    OpenAIApiKeyEnvironmentVariable = ReadString(JsonObject, TEXT("openAIApiKeyEnvironmentVariable"), OpenAIApiKeyEnvironmentVariable);
-    TimeoutSeconds = ReadInt(JsonObject, TEXT("timeoutSeconds"), TimeoutSeconds);
-    MaxOutputTokens = ReadInt(JsonObject, TEXT("maxOutputTokens"), MaxOutputTokens);
-    Temperature = ReadFloat(JsonObject, TEXT("temperature"), Temperature);
-    SourceOpenerMode = ReadString(JsonObject, TEXT("sourceOpenerMode"), SourceOpenerMode);
-    CustomSourceOpenerCommand = ReadString(JsonObject, TEXT("customSourceOpenerCommand"), CustomSourceOpenerCommand);
-
-    bool bImportedSecrets = false;
-    if (JsonObject->TryGetBoolField(TEXT("includesSecrets"), bImportedSecrets) && bImportedSecrets)
-    {
-        OpenAIApiKey = ReadString(JsonObject, TEXT("openAIApiKey"), OpenAIApiKey);
-    }
-
-    SaveConfig();
-}
-
 FString UGPAAEditorSettings::GetResolvedProjectRoot() const
 {
-    return ProjectRootOverride.IsEmpty()
-        ? FPaths::ConvertRelativePathToFull(FPaths::ProjectDir())
-        : ProjectRootOverride;
+    return ProjectRootOverride.IsEmpty() ? FPaths::ConvertRelativePathToFull(FPaths::ProjectDir())
+                                         : FPaths::ConvertRelativePathToFull(ProjectRootOverride);
 }
-
+void UGPAAEditorSettings::SavePersonalKey()
+{
+    const FString Key = OpenAIApiKey.TrimStartAndEnd();
+    if (Key.IsEmpty() || Key.StartsWith(TEXT("http")) || Key.Contains(TEXT("\n")) || Key.Contains(TEXT("\r")))
+    {
+        LastKeyResult = TEXT("Enter a single-line secret API key, not a website URL.");
+        return;
+    }
+    FGPAANativeSecrets Store;
+    FString Error;
+    if (Store.Write(FGPAANativeSecrets::Scope(OpenAIBaseUrl), Key, Error))
+    {
+        OpenAIApiKey.Reset();
+        LastKeyResult = TEXT("Personal key saved in Windows Credential Manager.");
+    }
+    else
+        LastKeyResult = Error;
+}
+void UGPAAEditorSettings::RemovePersonalKey()
+{
+    FGPAANativeSecrets Store;
+    FString Error;
+    OpenAIApiKey.Reset();
+    LastKeyResult =
+        Store.Remove(FGPAANativeSecrets::Scope(OpenAIBaseUrl), Error) ? TEXT("Personal key removed.") : Error;
+}
 FGPAAChatSettings UGPAAEditorSettings::ToChatSettings() const
 {
-    FGPAAChatSettings Settings;
-    Settings.Provider = ChatProvider;
-    Settings.OpenAIBaseUrl = OpenAIBaseUrl;
-    Settings.OpenAIModel = OpenAIModel;
-    Settings.OpenAIApiKey = OpenAIApiKey;
-    Settings.OpenAIApiKeyEnvironmentVariable = OpenAIApiKeyEnvironmentVariable;
-    Settings.TimeoutSeconds = TimeoutSeconds;
-    Settings.MaxOutputTokens = MaxOutputTokens;
-    Settings.Temperature = Temperature;
-    return Settings;
+    FGPAAChatSettings Result;
+    Result.Provider = ChatProvider;
+    Result.OpenAIBaseUrl = OpenAIBaseUrl;
+    Result.OpenAIModel = OpenAIModel;
+    Result.TimeoutSeconds = TimeoutSeconds;
+    Result.MaxOutputTokens = MaxOutputTokens;
+    return Result;
 }
-
-void UGPAAEditorSettings::ApplyChatSettings(const FGPAAChatSettings& ChatSettings)
+void UGPAAEditorSettings::ApplyChatSettings(const FGPAAChatSettings &Value)
 {
-    ChatProvider = ChatSettings.Provider;
-    OpenAIBaseUrl = ChatSettings.OpenAIBaseUrl;
-    OpenAIModel = ChatSettings.OpenAIModel;
-    OpenAIApiKey = ChatSettings.OpenAIApiKey;
-    OpenAIApiKeyEnvironmentVariable = ChatSettings.OpenAIApiKeyEnvironmentVariable;
-    TimeoutSeconds = ChatSettings.TimeoutSeconds;
-    MaxOutputTokens = ChatSettings.MaxOutputTokens;
-    Temperature = ChatSettings.Temperature;
+    ChatProvider = Value.Provider;
+    OpenAIBaseUrl = Value.OpenAIBaseUrl;
+    OpenAIModel = Value.OpenAIModel;
+    TimeoutSeconds = FMath::Clamp(Value.TimeoutSeconds, 5, 600);
+    MaxOutputTokens = FMath::Clamp(Value.MaxOutputTokens, 64, 32768);
     SaveConfig();
 }
-
-FString UGPAAEditorSettings::ResolveProfilePath(const FString& CandidatePath, const FString& DefaultFileName) const
+bool UGPAAEditorSettings::ChooseProfileFile(bool Save, FString& Path)
 {
-    if (!CandidatePath.IsEmpty())
+    auto* Desktop = FDesktopPlatformModule::Get();
+    if (!Desktop || FApp::IsUnattended())
     {
-        return FPaths::ConvertRelativePathToFull(CandidatePath);
+        LastProfileResult = TEXT("File dialogs are unavailable in this session.");
+        return false;
     }
+    TArray<FString> Files;
+    const void* Parent = FSlateApplication::IsInitialized()
+        ? FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr) : nullptr;
+    const FString Directory = LastProfileDirectory.IsEmpty() ? FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()) : LastProfileDirectory;
+    const FString Filter = TEXT("GPAA settings profile (*.json)|*.json");
+    const bool Chosen = Save
+        ? Desktop->SaveFileDialog(Parent, TEXT("Export Settings Profile"), Directory, TEXT("GPAASettingsProfile.json"), Filter, 0, Files)
+        : Desktop->OpenFileDialog(Parent, TEXT("Import Settings Profile"), Directory, TEXT(""), Filter, 0, Files);
+    if (!Chosen || Files.Num() != 1)
+    {
+        LastProfileResult = Save ? TEXT("Export cancelled.") : TEXT("Import cancelled.");
+        return false;
+    }
+    Path = FPaths::ConvertRelativePathToFull(Files[0]);
+    if (Save && FPaths::GetExtension(Path).IsEmpty()) Path += TEXT(".json");
+    LastProfileDirectory = FPaths::GetPath(Path);
+    return true;
+}
+void UGPAAEditorSettings::ExportSettingsProfile()
+{
+    FString Path;
+    if (ChooseProfileFile(true, Path)) ExportSettingsProfileToFile(Path);
+}
+void UGPAAEditorSettings::ImportSettingsProfile()
+{
+    FString Path;
+    if (ChooseProfileFile(false, Path)) ImportSettingsProfileFromFile(Path);
+}
+bool UGPAAEditorSettings::ExportSettingsProfileToFile(const FString& Path)
 
-    return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("GPAA"), DefaultFileName);
+{
+    auto Json = MakeShared<FJsonObject>();
+    Json->SetStringField(TEXT("chatProvider"), ChatProvider);
+    Json->SetStringField(TEXT("openAIBaseUrl"), OpenAIBaseUrl);
+    Json->SetStringField(TEXT("openAIModel"), OpenAIModel);
+    Json->SetNumberField(TEXT("timeoutSeconds"), TimeoutSeconds);
+    Json->SetNumberField(TEXT("maxOutputTokens"), MaxOutputTokens);
+    Json->SetStringField(TEXT("sourceOpenerMode"), SourceOpenerMode);
+    Json->SetStringField(TEXT("customSourceOpenerCommand"), CustomSourceOpenerCommand);
+    Json->SetBoolField(TEXT("includesSecrets"), false);
+    FString Output;
+    FJsonSerializer::Serialize(Json, TJsonWriterFactory<>::Create(&Output));
+    const bool Saved = !Path.IsEmpty() && FFileHelper::SaveStringToFile(Output, *Path);
+    LastProfileResult = Saved ? TEXT("Profile exported without keys or cloud consent.") : TEXT("Could not export profile.");
+    return Saved;
+}
+bool UGPAAEditorSettings::ImportSettingsProfileFromFile(const FString& Path)
+{
+    FString Input;
+    TSharedPtr<FJsonObject> Json;
+    if (Path.IsEmpty() || IFileManager::Get().FileSize(*Path) > 1024 * 1024 || !FFileHelper::LoadFileToString(Input, *Path) ||
+        !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Input), Json) || !Json)
+    {
+        LastProfileResult = TEXT("Select a valid settings profile (at most 1 MiB).");
+        return false;
+    }
+    auto Read = [&](const TCHAR *Name, FString &Value)
+    {
+        FString Candidate;
+        if (Json->TryGetStringField(Name, Candidate))
+            Value = Candidate;
+    };
+    Read(TEXT("chatProvider"), ChatProvider);
+    Read(TEXT("openAIBaseUrl"), OpenAIBaseUrl);
+    Read(TEXT("openAIModel"), OpenAIModel);
+    Read(TEXT("sourceOpenerMode"), SourceOpenerMode);
+    Read(TEXT("customSourceOpenerCommand"), CustomSourceOpenerCommand);
+    int32 Value;
+    if (Json->TryGetNumberField(TEXT("timeoutSeconds"), Value))
+        TimeoutSeconds = FMath::Clamp(Value, 5, 600);
+    if (Json->TryGetNumberField(TEXT("maxOutputTokens"), Value))
+        MaxOutputTokens = FMath::Clamp(Value, 64, 32768);
+    bCloudContextAccepted = false;
+    SaveConfig();
+    LastProfileResult =
+        TEXT("Profile imported. Keys were ignored; review the provider and enable cloud consent again.");
+    return true;
 }

@@ -1,18 +1,23 @@
 {
   "FileVersion": 3,
-  "Version": 1,
-  "VersionName": "0.1.0",
+  "Version": 2,
+  "VersionName": "0.2.0",
   "FriendlyName": "Game Production AI Assistant",
-  "Description": "Local-first AI assistant integration for Unreal Engine production workflows.",
+  "Description": "Local project search and source-aware cloud chat inside Unreal Editor. Windows x64; personal API key required for cloud chat.",
   "Category": "AI",
-  "CreatedBy": "Game Production AI Assistant",
+  "CreatedBy": "Maxime ESPRIT",
   "CanContainContent": false,
   "IsBetaVersion": true,
   "Installed": false,
+  "EngineVersion": "5.6.0",
+  "Plugins": [{ "Name": "SQLiteCore", "Enabled": true }],
   "Modules": [
+    { "Name": "GPAACore", "Type": "Editor", "LoadingPhase": "Default", "PlatformAllowList": ["Win64"] },
+    { "Name": "GPAAInference", "Type": "Editor", "LoadingPhase": "Default", "PlatformAllowList": ["Win64"] },
     {
       "Name": "GPAAssistant",
       "Type": "Editor",
+      "PlatformAllowList": ["Win64"],
       "LoadingPhase": "Default"
     }
   ]

@@ -1,21 +1,24 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #pragma once
 
 #include "CoreMinimal.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
-#include "Services/GPAAHttpClient.h"
-#include "Services/GPAABackendSupervisor.h"
+#include "Models/GPAAApiModels.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Views/SListView.h"
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 class SEditableTextBox;
+class SButton;
 class SMultiLineEditableTextBox;
 class STableViewBase;
 class STextBlock;
 class SWidgetSwitcher;
+enum class ECheckBoxState : uint8;
 class ITableRow;
+template<typename OptionType> class SSegmentedControl;
 
 class SGPAAssistantWidget final : public SCompoundWidget
 {
@@ -24,12 +27,29 @@ public:
     SLATE_END_ARGS()
 
     void Construct(const FArguments& InArgs);
+    virtual ~SGPAAssistantWidget() override;
 
 private:
+    friend class FGPAAHistoryLayoutTest;
+    friend class FGPAAPromptLayoutTest;
+    friend class FGPAASearchLayoutTest;
+    friend class FGPAAViewSelectorTest;
+    friend class FGPAACancelUiTest;
+    EVisibility GetRequestCancelVisibility(bool ForAsk) const;
+    TSharedPtr<SButton> PromptCancelButton, SearchCancelButton;
+    bool bCancellable = false;
+    bool bRequestIsAsk = false;
+    void OnViewSelectionChanged(int32 Index);
+    TSharedPtr<SSegmentedControl<int32>> ViewSelector;
+    void SetAnswerText(const FString& Text);
+    TSharedPtr<SWidgetSwitcher> MainViewSwitcher;
+    FReply OnCancelClicked();
+    void StartNative(bool Ask);
+    FGuid NativeRequestId;
+    FString NativeAnswer;
     FReply OnOpenSettingsClicked();
     FReply OnLoadChatSettingsClicked();
     FReply OnSaveChatSettingsClicked();
-    FReply OnRefreshKnowledgeClicked();
     FReply OnHistoryClicked();
     FReply OnCloseHistoryClicked();
     FReply OnPromptTabClicked();
@@ -49,30 +69,23 @@ private:
     void InitializeChatProviderOptions();
     void LoadPluginSettings();
     void SavePluginSettings() const;
-    void EnsureBackendReady(const FString& BusyMessage, TFunction<void()> OnReady);
-    void LoadChatSettingsFromBackend();
-    void SaveChatSettingsToBackend();
+    void LoadChatSettings();
+    void SaveChatSettings();
     void ApplyChatSettingsResponse(bool bSucceeded, const FString& Message);
-    void LoadKnowledgeStatus();
-    void ApplyKnowledgeStatusResponse(bool bSucceeded, const FString& Message);
-    void UpdateKnowledgeSummaryFromIndexResponse(const FString& Message);
-    void UpdateKnowledgeSummary(const FGPAAIndexStatistics& Statistics);
     FGPAAChatSettings GetChatSettingsFromUi() const;
     void OnSourceOpenerModeChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
     void OnChatProviderChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
-    void OnSearchResultFilterChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo);
+    TSharedRef<SWidget> MakeSearchScopeRadio(const FText& Label, const FString& Scope);
+    ECheckBoxState GetSearchScopeCheckState(FString Scope) const;
+    void OnSearchScopeChanged(ECheckBoxState State, FString Scope);
     void OnCustomSourceOpenerCommitted(const FText& Text, ETextCommit::Type CommitType);
     TSharedRef<SWidget> GenerateSourceOpenerModeWidget(TSharedPtr<FString> Item) const;
     TSharedRef<SWidget> GenerateChatProviderWidget(TSharedPtr<FString> Item) const;
-    TSharedRef<SWidget> GenerateSearchResultFilterWidget(TSharedPtr<FString> Item) const;
     FText GetSelectedSourceOpenerModeText() const;
     FText GetSelectedChatProviderText() const;
-    FText GetSelectedSearchResultFilterText() const;
     FText GetSettingsSummaryText() const;
-    EVisibility GetHistoryVisibility() const;
     EVisibility GetCustomSourceOpenerVisibility() const;
     EVisibility GetOpenAICompatibleSettingsVisibility() const;
-    FString GetBackendUrl() const;
     FString GetProjectRoot() const;
     FString GetPromptQuestion() const;
     FString GetSearchQuery() const;
@@ -84,20 +97,15 @@ private:
     EActiveTimerReturnType HandleBusyTick(double InCurrentTime, float InDeltaTime);
     void StopBusy();
 
-    TSharedPtr<FGPAAHttpClient> HttpClient;
-    TSharedPtr<FGPAABackendSupervisor, ESPMode::ThreadSafe> BackendSupervisor;
     TSharedPtr<SComboBox<TSharedPtr<FString>>> SourceOpenerComboBox;
     TSharedPtr<SEditableTextBox> SourceOpenerTextBox;
     TSharedPtr<SComboBox<TSharedPtr<FString>>> ChatProviderComboBox;
     TSharedPtr<SEditableTextBox> PromptQuestionTextBox;
     TSharedPtr<SEditableTextBox> SearchQueryTextBox;
-    TSharedPtr<SComboBox<TSharedPtr<FString>>> SearchResultFilterComboBox;
     TSharedPtr<SWidgetSwitcher> TabSwitcher;
     TSharedPtr<STextBlock> StatusText;
     TSharedPtr<STextBlock> SettingsSummaryText;
-    TSharedPtr<STextBlock> KnowledgeText;
     TSharedPtr<STextBlock> SearchSummaryText;
-    TSharedPtr<STextBlock> AnswerSummaryText;
     TSharedPtr<SMultiLineEditableTextBox> AnswerTextBox;
     TSharedPtr<SMultiLineEditableTextBox> HistoryTextBox;
     TSharedPtr<SListView<TSharedPtr<FGPAASourceReference>>> SearchResultsListView;
@@ -105,14 +113,12 @@ private:
     TSharedPtr<FString> SelectedSourceOpenerMode;
     TArray<TSharedPtr<FString>> ChatProviderModes;
     TSharedPtr<FString> SelectedChatProviderMode;
-    TArray<TSharedPtr<FString>> SearchResultFilterModes;
-    TSharedPtr<FString> SelectedSearchResultFilterMode;
     FString CustomSourceOpenerCommand = TEXT("code -g \"{file}:{line}\"");
+    FString SelectedSearchScope = TEXT("All");
     FString BusyBaseMessage;
     int32 BusyFrame = 0;
     int32 ActiveTabIndex = 0;
     bool bBusy = false;
-    bool bHistoryVisible = false;
     TArray<TSharedPtr<FGPAASourceReference>> SearchResults;
     TArray<TSharedPtr<FGPAASourceReference>> FilteredSearchResults;
     TArray<TSharedPtr<FGPAASourceReference>> AnswerSources;

@@ -1,5 +1,7 @@
 # Unreal Plugin Packaging CI/CD Roadmap
 
+The current Unreal CI job builds the native 0.2.0 package using `package-native-plugin.ps1` and validates it with `test-native-plugin.ps1`. It can select an installed UE 5.6 or UE 5.8 runner via manual input; actual compatibility is tracked in [native delivery status](native-delivery-a-status.md). The embedded .NET backend pipeline described below is the historical 0.1.0 baseline, not the Fab submission artifact for the native edition.
+
 ## Purpose
 
 This document defines the path from the current local Unreal plugin packaging workflow to a reproducible CI/CD release pipeline.

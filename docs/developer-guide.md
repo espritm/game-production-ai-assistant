@@ -1,5 +1,7 @@
 # Developer Guide
 
+This document describes the retained .NET reference implementation. The current editor plugin is native C++; see [Native user guide](native-user-guide.md), [migration plan](native-plugin-implementation-plan.md) and [delivery status](native-delivery-a-status.md). The native distribution does not include the backend client or supervisor described below.
+
 ## Architecture
 
 Game Production AI Assistant V1 is built as a local-first backend that runs on the user's workstation.

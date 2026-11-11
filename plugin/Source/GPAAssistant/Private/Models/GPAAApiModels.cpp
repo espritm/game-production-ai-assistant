@@ -1,3 +1,4 @@
+// Copyright Game Production AI Assistant contributors 2026.
 #include "Models/GPAAApiModels.h"
 
 #include "Dom/JsonObject.h"
