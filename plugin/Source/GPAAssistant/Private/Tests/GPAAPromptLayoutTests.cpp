@@ -48,6 +48,27 @@ bool FGPAAPromptLayoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Long answer text retained in full"), Panel->AnswerTextBox->GetText().ToString(), LongAnswer);
     if (Long.Num() == 1)
         TestTrue(TEXT("Long content is constrained to its viewport"), Long[0].Geometry.GetLocalSize().Y <= 400);
+    Panel->PromptQuestionTextBox->SetText(FText::FromString(TEXT("First question")));
+    Panel->BeginPromptTurn(Panel->GetPromptQuestion());
+    TestTrue(TEXT("Sending clears the input"), Panel->GetPromptQuestion().IsEmpty());
+    Panel->NativeAnswer = TEXT("First streamed answer"); Panel->RenderPromptTurn();
+    TestTrue(TEXT("Submitted question remains visible during streaming"), Panel->AnswerTextBox->GetText().ToString().Contains(TEXT("You:\nFirst question")));
+    Panel->SetChatResult(true, TEXT("Complete"), TEXT("First complete answer"), {});
+    Panel->BeginPromptTurn(TEXT("Second question"));
+    Panel->NativeAnswer = TEXT("Second partial answer"); Panel->RenderPromptTurn();
+    const FString Stream = Panel->AnswerTextBox->GetText().ToString();
+    TestTrue(TEXT("Second response preserves the previous turn"), Stream.Contains(TEXT("First complete answer")) && Stream.Contains(TEXT("Second question")) && Stream.Contains(TEXT("Second partial answer")));
+    TestFalse(TEXT("Completed turn replaces its streaming draft"), Stream.Contains(TEXT("First streamed answer")));
+    Panel->SetChatResult(false, TEXT("Test interruption"), TEXT("Second partial answer"), {});
+    TestTrue(TEXT("Interrupted response remains in the thread"), Panel->AnswerTextBox->GetText().ToString().Contains(TEXT("Second partial answer\n\n[Interrupted] Test interruption")));
+    const FString Thread = Panel->AnswerTextBox->GetText().ToString();
+    Panel->SetResult(true, TEXT("Settings loaded"));
+    TestEqual(TEXT("Status updates do not replace conversation"), Panel->AnswerTextBox->GetText().ToString(), Thread);
+    Panel->bBusy = true;
+    Panel->PromptQuestionTextBox->SetText(FText::FromString(TEXT("Unsent draft")));
+    Panel->StartNative(true);
+    TestEqual(TEXT("Sending while busy preserves unsent input"), Panel->GetPromptQuestion(), FString(TEXT("Unsent draft")));
+    Panel->StopBusy();
     return true;
 }
 #endif

@@ -47,6 +47,11 @@ private:
     void OnViewSelectionChanged(int32 Index);
     TSharedPtr<SSegmentedControl<int32>> ViewSelector;
     void SetAnswerText(const FString& Text);
+    void BeginPromptTurn(const FString& Prompt);
+    void RenderPromptTurn();
+    void FinishPromptTurn(const FString& Answer);
+    FString ConversationText, ActivePrompt;
+    bool bPromptTurnActive = false;
     TSharedPtr<SWidgetSwitcher> MainViewSwitcher;
     FReply OnCancelClicked();
     void StartNative(bool Ask);

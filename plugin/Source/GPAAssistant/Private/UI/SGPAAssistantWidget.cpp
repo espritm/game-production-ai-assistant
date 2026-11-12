@@ -452,6 +452,7 @@ SGPAAssistantWidget::~SGPAAssistantWidget()
 FReply SGPAAssistantWidget::OnCancelClicked()
 {
     if (!bCancellable) return FReply::Handled();
+    if (bRequestIsAsk && bPromptTurnActive) FinishPromptTurn(NativeAnswer + TEXT("\n[Cancelled]"));
     NativeRequestId = FGuid::NewGuid();
     FGPAANativeRuntime::CancelIfRunning(); StopBusy();
     StatusText->SetText(FText::FromString(TEXT("Operation cancelled. Any partial response is kept in local history.")));
@@ -460,6 +461,7 @@ FReply SGPAAssistantWidget::OnCancelClicked()
 
 void SGPAAssistantWidget::StartNative(bool Ask)
 {
+    if (bBusy) { StatusText->SetText(LOCTEXT("RequestStillRunning", "A request is already running. Wait for it to finish or cancel it first.")); return; }
     if (FGPAAQuickStart::IsRunning()) { SetResult(false, TEXT("Wait for Quick Start to finish, or cancel it first.")); return; }
     LoadPluginSettings();
     const FString Query = Ask ? GetPromptQuestion() : GetSearchQuery();
@@ -470,17 +472,16 @@ void SGPAAssistantWidget::StartNative(bool Ask)
     bRequestIsAsk = Ask;
     if (Ask) ActiveChatProviderName = GetSelectedChatProviderName();
     NativeAnswer.Reset(); SetBusy(TEXT("Preparing local project knowledge..."));
-    if (Ask) SetAnswerText(TEXT(""));
+    if (Ask) BeginPromptTurn(Query);
     FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, false,
         [Weak, RequestId](const FString& Message) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) W->SetBusy(Message); },
-        [Weak, RequestId](const FString& Delta) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) { W->NativeAnswer += Delta; W->SetAnswerText(W->NativeAnswer); } },
+        [Weak, RequestId](const FString& Delta) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) { W->NativeAnswer += Delta; W->RenderPromptTurn(); } },
         [Weak, RequestId, Ask](bool Ok, const FString& Message, const FGPAANativeResult& Result)
         {
             auto W = Weak.Pin(); if (!W || W->NativeRequestId != RequestId) return;
             if (Ask)
             {
                 W->SetChatResult(Ok, Message, Result.Answer, Result.Sources);
-                if (!Ok && !Result.Answer.IsEmpty()) W->SetAnswerText(Result.Answer + TEXT("\n\n[Interrupted] ") + Message);
             }
             else W->SetSearchResult(Ok, Message, Result.Sources);
         }, Ask ? SourceFilterAll : GetSelectedSourceFilterName());
@@ -511,8 +512,8 @@ void SGPAAssistantWidget::SetBusyFromWorkflow(bool bSucceeded, const FString& Me
 void SGPAAssistantWidget::SetResult(bool bSucceeded, const FString& Message)
 {
     StopBusy();
-    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Ready") : TEXT("Error")));
-    SetAnswerText(Message);
+    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Ready") : Message));
+    StatusText->SetToolTipText(FText::FromString(Message));
 }
 
 void SGPAAssistantWidget::SetHistoryResult(bool bSucceeded, const FString& Message)
@@ -549,13 +550,37 @@ void SGPAAssistantWidget::SetAnswerText(const FString& Text)
     AnswerTextBox->ScrollTo(ETextLocation::EndOfDocument);
 }
 
+void SGPAAssistantWidget::BeginPromptTurn(const FString& Prompt)
+{
+    ActivePrompt = Prompt;
+    NativeAnswer.Reset();
+    bPromptTurnActive = true;
+    PromptQuestionTextBox->SetText(FText::GetEmpty());
+    RenderPromptTurn();
+}
+void SGPAAssistantWidget::RenderPromptTurn()
+{
+    SetAnswerText(ConversationText + (bPromptTurnActive
+        ? TEXT("You:\n") + ActivePrompt + TEXT("\n\nAI:\n") + NativeAnswer : FString()));
+}
+void SGPAAssistantWidget::FinishPromptTurn(const FString& Answer)
+{
+    ConversationText += TEXT("You:\n") + ActivePrompt + TEXT("\n\nAI:\n") + Answer + TEXT("\n\n");
+    bPromptTurnActive = false;
+    ActivePrompt.Reset();
+    RenderPromptTurn();
+}
+
 void SGPAAssistantWidget::SetChatResult(bool bSucceeded, const FString& Message, const FString& Answer, const TArray<FGPAASourceReference>& Sources)
 {
     StopBusy();
     StatusText->SetText(FText::FromString(bSucceeded
         ? FString::Printf(TEXT("Answer complete via %s"), ActiveChatProviderName.IsEmpty() ? *GetSelectedChatProviderName() : *ActiveChatProviderName)
         : TEXT("Error")));
-    SetAnswerText(bSucceeded ? Answer : Message);
+    FString FinalAnswer = Answer.IsEmpty() ? NativeAnswer : Answer;
+    if (!bSucceeded) FinalAnswer += (FinalAnswer.IsEmpty() ? TEXT("[Error] ") : TEXT("\n\n[Interrupted] ")) + Message;
+    if (bPromptTurnActive) FinishPromptTurn(FinalAnswer);
+    else SetAnswerText(FinalAnswer);
 
     AnswerSources.Reset();
     if (bSucceeded)
