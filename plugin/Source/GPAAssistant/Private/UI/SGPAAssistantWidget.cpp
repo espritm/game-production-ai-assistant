@@ -166,7 +166,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .FillWidth(1.0f)
                             .Padding(0.0f, 0.0f, 8.0f, 0.0f)
                             [
-                                SNew(SBox).MaxDesiredHeight(160)
+                                SNew(SBox).MinDesiredHeight(64).MaxDesiredHeight(160)
                                 [SAssignNew(PromptQuestionTextBox, SMultiLineEditableTextBox)
                                 .HintText(LOCTEXT("QuestionPlaceholder", "Prompt your AI here"))
                                 .AutoWrapText(true)
@@ -180,12 +180,13 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
 
                             + SHorizontalBox::Slot()
                             .AutoWidth()
+                            .VAlign(VAlign_Bottom)
                             [
                                 SNew(SButton)
                                 .Text(LOCTEXT("SendButton", "Send"))
                                 .OnClicked(this, &SGPAAssistantWidget::OnAskClicked)
                             ]
-                            + SHorizontalBox::Slot().AutoWidth().Padding(8,0,0,0)
+                            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(8,0,0,0)
                             [
                                 SAssignNew(PromptCancelButton, SButton)
                                 .Text(LOCTEXT("CancelRequestButton", "Cancel"))
