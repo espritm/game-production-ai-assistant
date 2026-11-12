@@ -166,12 +166,16 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .FillWidth(1.0f)
                             .Padding(0.0f, 0.0f, 8.0f, 0.0f)
                             [
-                                SAssignNew(PromptQuestionTextBox, SEditableTextBox)
+                                SNew(SBox).MaxDesiredHeight(160)
+                                [SAssignNew(PromptQuestionTextBox, SMultiLineEditableTextBox)
                                 .HintText(LOCTEXT("QuestionPlaceholder", "Prompt your AI here"))
+                                .AutoWrapText(true)
+                                .ModiferKeyForNewLine(EModifierKey::Shift)
+                                .ToolTipText(LOCTEXT("PromptKeyboardHelp", "Enter to send. Shift+Enter for a new line."))
                                 .OnTextCommitted_Lambda([this](const FText&, ETextCommit::Type CommitType)
                                 {
                                     if (CommitType == ETextCommit::OnEnter) OnAskClicked();
-                                })
+                                })]
                             ]
 
                             + SHorizontalBox::Slot()

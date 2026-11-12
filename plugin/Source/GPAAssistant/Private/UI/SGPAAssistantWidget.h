@@ -111,7 +111,7 @@ private:
     TSharedPtr<SComboBox<TSharedPtr<FString>>> SourceOpenerComboBox;
     TSharedPtr<SEditableTextBox> SourceOpenerTextBox;
     TSharedPtr<SComboBox<TSharedPtr<FString>>> ChatProviderComboBox;
-    TSharedPtr<SEditableTextBox> PromptQuestionTextBox;
+    TSharedPtr<SMultiLineEditableTextBox> PromptQuestionTextBox;
     TSharedPtr<SEditableTextBox> SearchQueryTextBox;
     TSharedPtr<SWidgetSwitcher> TabSwitcher;
     TSharedPtr<STextBlock> StatusText;
