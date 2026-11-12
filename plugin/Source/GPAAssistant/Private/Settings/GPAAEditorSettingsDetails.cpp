@@ -53,10 +53,10 @@ void FGPAAEditorSettingsDetails::CustomizeDetails(IDetailLayoutBuilder& Builder)
                 [Help(NSLOCTEXT("GPAASettings", "LocalChoiceHelp", "Generate answers on this computer using a downloaded model. No API key is needed and project context stays local. Download a model in Local AI, or use Quick Start in the assistant panel."))]
             + SHorizontalBox::Slot().AutoWidth()[Radio(TEXT("Cloud AI Provider"), false)]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6,0)
-                [Help(NSLOCTEXT("GPAASettings", "CloudChoiceHelp", "Selecting Cloud AI Provider authorizes sending your questions and relevant project excerpts (code and asset metadata) to the configured provider. A personal API key is required; provider charges may apply. Search remains local."))]];
+                [Help(NSLOCTEXT("GPAASettings", "CloudChoiceHelp", "Selecting Cloud AI Provider authorizes sending your questions and relevant project excerpts (code and asset metadata) to the configured provider. A personal API key is required. Any API usage charges are billed by the cloud provider you configure and select, according to that provider's pricing. Search remains local."))]];
     Setup.AddCustomRow(FText::FromString(TEXT("Cloud context authorization"))).WholeRowContent()
         [SNew(STextBlock).AutoWrapText(true).Text(NSLOCTEXT("GPAASettings", "CloudChoiceNotice",
-            "Selecting Cloud AI Provider authorizes sending questions and relevant project excerpts to that provider. API charges may apply."))];
+            "Selecting Cloud AI Provider authorizes sending questions and relevant project excerpts to that provider. Any API usage charges are billed by the cloud provider you configure and select, according to that provider's pricing."))];
     Builder.EditCategory(TEXT("Cloud AI Provider")).SetSortOrder(1);
     Builder.EditCategory(TEXT("Local AI")).SetSortOrder(2);
     auto& Project = Builder.EditCategory(TEXT("Project")); Project.SetSortOrder(3);
