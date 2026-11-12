@@ -12,6 +12,8 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Widgets/Images/SImage.h"
+#include "Styling/CoreStyle.h"
 
 TSharedRef<IDetailCustomization> FGPAAEditorSettingsDetails::MakeInstance()
 {
@@ -59,8 +61,27 @@ void FGPAAEditorSettingsDetails::CustomizeDetails(IDetailLayoutBuilder& Builder)
     };
     AddStatus(TEXT("Chat"), &UGPAAEditorSettings::LastKeyResult);
     auto& Local = Builder.EditCategory(TEXT("Local AI"));
-    Local.AddProperty(Builder.GetProperty(GET_MEMBER_NAME_CHECKED(UGPAAEditorSettings, LocalModelId)))
-        .IsEnabled(TAttribute<bool>::CreateLambda([]() { return !FGPAALocalModels::Get().IsBusy(); }));
+    const auto ModelId = Builder.GetProperty(GET_MEMBER_NAME_CHECKED(UGPAAEditorSettings, LocalModelId));
+    const auto ModelSelector = ModelId->CreatePropertyValueWidget();
+    ModelSelector->SetEnabled(TAttribute<bool>::CreateLambda([]() { return !FGPAALocalModels::Get().IsBusy(); }));
+    Local.AddProperty(ModelId).CustomWidget()
+        .NameContent()[ModelId->CreatePropertyNameWidget()]
+        .ValueContent().MinDesiredWidth(320)
+        [SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().FillWidth(1)
+                [ModelSelector]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6, 0)
+                [SNew(SImage).Image(FCoreStyle::Get().GetBrush(TEXT("Icons.Help")))
+                    .ToolTipText(NSLOCTEXT("GPAASettings", "LocalModelCatalogueHelp",
+                        "This list is a catalogue built into the plugin, not a live list from a model service.\n\n"
+                        "It contains Qwen2.5-Coder Instruct 1.5B (Light) and 7B (Larger), in GGUF Q4_K_M format, "
+                        "from Qwen's official repositories on Hugging Face:\n"
+                        "huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF\n"
+                        "huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF\n\n"
+                        "Both models use the Apache 2.0 license. Downloads start only when you request them; "
+                        "the plugin verifies the pinned model version using its size and SHA-256 checksum. "
+                        "Generation runs locally on your CPU, without sending prompts to Hugging Face.\n\n"
+                        "To try another model, use Browse... to select a local GGUF file. Compatibility is not guaranteed."))]];
     Local.AddCustomRow(FText::FromString(TEXT("Model download information"))).WholeRowContent()
         [SNew(STextBlock).AutoWrapText(true).Text_Lambda([Settings]()
         { return FText::FromString(Settings.IsValid() ? Settings->GetLocalModelDescription() : FString()); })];
