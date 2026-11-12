@@ -411,7 +411,7 @@ TSharedRef<SWidget> SGPAAssistantWidget::MakeQuickStartPanel()
                 .OnClicked(this, &SGPAAssistantWidget::OnQuickStartClicked)]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6,0)
                 [SNew(SImage).Image(FCoreStyle::Get().GetBrush(TEXT("Icons.Help")))
-                    .ToolTipText(LOCTEXT("QuickStartHelp", "Selects Local AI, downloads and verifies the Light Qwen model (about 1.04 GiB, Apache 2.0) from Qwen on Hugging Face, then runs a short local test prompt. Requires internet for the first download and additional disk space/RAM. A verified cached model is reused. No API key or cloud prompt is used. Closing this panel cancels Quick Start."))]
+                    .ToolTipText(LOCTEXT("QuickStartHelp", "Selects Local AI, downloads and verifies the Light Qwen model (about 1.04 GiB, Apache 2.0) from Qwen on Hugging Face, then runs a short local test prompt. Requires internet for the first download and additional disk space/RAM. A verified cached model is reused. Answer quality depends directly on the selected model: Light is a starting point, and a more capable model is recommended for better results if your hardware supports it. No API key or cloud prompt is used; prompts and project excerpts stay on this computer. Cloud models can offer better results than lightweight local models, but sending project content to a cloud provider does not guarantee its confidentiality. Closing this panel cancels Quick Start."))]
             + SHorizontalBox::Slot().AutoWidth().Padding(8,0)
                 [SNew(SButton).Text(LOCTEXT("CancelQuickStart", "Cancel"))
                     .Visibility_Lambda([this]() { return QuickStart->Running() ? EVisibility::Visible : EVisibility::Collapsed; })

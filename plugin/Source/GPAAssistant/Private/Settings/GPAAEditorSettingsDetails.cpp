@@ -50,13 +50,16 @@ void FGPAAEditorSettingsDetails::CustomizeDetails(IDetailLayoutBuilder& Builder)
         [SNew(SHorizontalBox)
             + SHorizontalBox::Slot().AutoWidth()[Radio(TEXT("Local AI"), true)]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6,0,20,0)
-                [Help(NSLOCTEXT("GPAASettings", "LocalChoiceHelp", "Generate answers on this computer using a downloaded model. No API key is needed and project context stays local. Download a model in Local AI, or use Quick Start in the assistant panel."))]
+                [Help(NSLOCTEXT("GPAASettings", "LocalChoiceHelp", "Generate answers on this computer using a downloaded model. No API key is needed. The plugin keeps prompts and project excerpts on this computer instead of sending them to an AI provider. This avoids cloud disclosure; overall confidentiality still depends on the security of your computer and other software. Answer quality depends directly on the selected model. A more capable model is recommended for better results, within your hardware limits. Download a model in Local AI, or use Quick Start in the assistant panel."))]
             + SHorizontalBox::Slot().AutoWidth()[Radio(TEXT("Cloud AI Provider"), false)]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6,0)
-                [Help(NSLOCTEXT("GPAASettings", "CloudChoiceHelp", "Selecting Cloud AI Provider authorizes sending your questions and relevant project excerpts (code and asset metadata) to the configured provider. A personal API key is required. Any API usage charges are billed by the cloud provider you configure and select, according to that provider's pricing. Search remains local."))]];
+                [Help(NSLOCTEXT("GPAASettings", "CloudChoiceHelp", "Selecting Cloud AI Provider authorizes sending your questions and relevant project excerpts (code and asset metadata) to the configured provider. A personal API key is required. Any API usage charges are billed by the cloud provider you configure and select, according to that provider's pricing. Sending project content to a cloud AI does not guarantee its confidentiality: processing, retention and access depend on the provider and your account terms. Review those terms before sharing private code. Answer quality depends directly on the selected model; choose a capable model for better results. Leading cloud models often outperform the lightweight local models offered here, although advanced local installations can run more capable models. Search remains local."))]];
     Setup.AddCustomRow(FText::FromString(TEXT("Cloud context authorization"))).WholeRowContent()
         [SNew(STextBlock).AutoWrapText(true).Text(NSLOCTEXT("GPAASettings", "CloudChoiceNotice",
-            "Selecting Cloud AI Provider authorizes sending questions and relevant project excerpts to that provider. Any API usage charges are billed by the cloud provider you configure and select, according to that provider's pricing."))];
+            "Selecting Cloud AI Provider authorizes sending questions and relevant project excerpts to that provider. Any API usage charges are billed by the cloud provider you configure and select, according to that provider's pricing. Project confidentiality cannot be guaranteed when content is sent to a cloud AI; review your provider's data-handling terms."))];
+    Setup.AddCustomRow(FText::FromString(TEXT("Model quality and privacy"))).WholeRowContent()
+        [SNew(STextBlock).AutoWrapText(true).Text(NSLOCTEXT("GPAASettings", "ModelQualityNotice",
+            "Answer quality depends directly on the selected AI model. For better results, choose a more capable model within your hardware or provider budget. Leading cloud models often outperform lightweight local models; advanced local installations can use more capable models. In Local mode, this plugin does not send prompts or project excerpts to an AI provider."))];
     Builder.EditCategory(TEXT("Cloud AI Provider")).SetSortOrder(1);
     Builder.EditCategory(TEXT("Local AI")).SetSortOrder(2);
     auto& Project = Builder.EditCategory(TEXT("Project")); Project.SetSortOrder(3);
@@ -123,6 +126,7 @@ void FGPAAEditorSettingsDetails::CustomizeDetails(IDetailLayoutBuilder& Builder)
                         "Both models use the Apache 2.0 license. Downloads start only when you request them; "
                         "the plugin verifies the pinned model version using its size and SHA-256 checksum. "
                         "Generation runs locally on your CPU, without sending prompts to Hugging Face.\n\n"
+                        "Answer quality depends directly on the selected model. Light favors a small download and modest hardware requirements; it is not a guarantee of high-quality answers. For better results, choose a more capable model that your hardware can run, and always verify its answers. Leading cloud models often outperform lightweight local models; advanced local installations can narrow that gap. Local generation keeps prompts and project excerpts on this computer.\n\n"
                         "To try another model, use Browse... to select a local GGUF file. Compatibility is not guaranteed."))]];
     Local.AddCustomRow(FText::FromString(TEXT("Model download information"))).WholeRowContent()
         [SNew(STextBlock).AutoWrapText(true).Text_Lambda([Settings]()

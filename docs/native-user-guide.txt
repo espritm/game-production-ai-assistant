@@ -98,3 +98,9 @@ For support, email contact@maximeesprit.fr with the plugin version, exact Unreal
 ## Included software
 
 llama.cpp b12284 (MIT), ONNX Runtime 1.20.1 (MIT) and a pinned all-MiniLM-L6-v2 model/vocabulary (Apache-2.0) are bundled. Full attribution and upstream notices are included in Docs/native-third-party-notices.md and Source/ThirdParty. The optional Qwen2.5 Coder instruction GGUF catalogue uses Apache-2.0 model licenses; its weights are not bundled. SQLiteCore and ICU come from Unreal Engine. No demo project or animation asset is included.
+
+## Model quality and confidentiality
+
+Answer quality depends directly on the AI model you select, as well as the available project context. For a better experience and stronger results, choose a more capable model within your hardware or provider budget, and verify its answers. The Light model prioritizes a small download and modest hardware requirements. Leading cloud models often outperform lightweight local models; advanced local installations can run more capable models.
+
+Sending prompts and project excerpts to a cloud AI does not guarantee project confidentiality: processing, retention and access depend on the selected provider and your account terms. In Local mode this plugin does not send prompts or project excerpts to an AI provider, preserving their confidentiality with respect to cloud AI services. This is not a blanket security guarantee for the computer, other software, backups or shared files. Explicit model downloads contact the public model host without transmitting project context.
