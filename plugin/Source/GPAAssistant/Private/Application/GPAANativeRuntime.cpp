@@ -266,7 +266,7 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
         else
         {
             if (Settings->ChatProvider != TEXT("OpenAI") && Settings->ChatProvider != TEXT("OpenAICompatible"))
-            { OnFinished(false, TEXT("Select Local, OpenAI or OpenAICompatible in Settings."), {}); return; }
+            { OnFinished(false, TEXT("Setup required. Use Quick Start or select Local AI / Cloud AI Provider in Settings."), {}); return; }
             ChatRequest.Endpoint = Settings->OpenAIBaseUrl;
             ChatRequest.Model = Settings->OpenAIModel;
             ChatRequest.Responses = Settings->ChatProvider == TEXT("OpenAI");
@@ -274,8 +274,6 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
             ChatRequest.Key = Secrets.Read(FGPAANativeSecrets::Scope(ChatRequest.Endpoint));
             if (ChatRequest.Key.IsEmpty())
             { OnFinished(false, TEXT("Open Settings, enter your personal API key and use Save Personal Key."), {}); return; }
-            if (!Settings->bCloudContextAccepted)
-            { OnFinished(false, TEXT("Enable Cloud Context Consent in Settings before sending project excerpts to your provider."), {}); return; }
         }
     }
 

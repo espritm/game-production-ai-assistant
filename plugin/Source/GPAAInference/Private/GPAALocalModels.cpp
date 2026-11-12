@@ -145,6 +145,7 @@ bool FGPAALocalModels::Download(const FString& Id, const FString& Directory)
 {
     const auto* Found = Find(Id);
     if (Stopping || IsBusy() || !Found) return false;
+    DownloadSucceeded.Store(false);
     const FGPAALocalModelSpec Spec = *Found;
     Task = MakeShared<FGPAATask, ESPMode::ThreadSafe>(); const auto Current = Task;
     SetStatus(TEXT("Preparing model download..."));
@@ -156,7 +157,8 @@ bool FGPAALocalModels::Download(const FString& Id, const FString& Directory)
         IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
         FString Error;
         if (IFileManager::Get().FileExists(*Path))
-        { SetStatus(ValidateFile(Path, &Spec, Current, Error) ? TEXT("Ready — model already verified.") : Error); return; }
+        { const bool Ok = ValidateFile(Path, &Spec, Current, Error); DownloadSucceeded.Store(Ok);
+          SetStatus(Ok ? TEXT("Ready — model already verified.") : Error); return; }
         int64 Position = FMath::Max<int64>(0, IFileManager::Get().FileSize(*Partial));
         if (Position > Spec.Bytes) { SetStatus(TEXT("Partial file exceeds the model size. Use Remove Downloaded Model and retry.")); return; }
         uint64 Total = 0, Free = 0;
@@ -178,6 +180,7 @@ bool FGPAALocalModels::Download(const FString& Id, const FString& Directory)
         SetStatus(TEXT("Verifying model SHA256..."));
         if (!ValidateFile(Partial, &Spec, Current, Error)) { SetStatus(Error); return; }
         if (!IFileManager::Get().Move(*Path, *Partial, false, false)) { SetStatus(TEXT("Could not activate the verified model.")); return; }
+        DownloadSucceeded.Store(true);
         SetStatus(TEXT("Ready — local model downloaded and verified."));
     });
     return true;

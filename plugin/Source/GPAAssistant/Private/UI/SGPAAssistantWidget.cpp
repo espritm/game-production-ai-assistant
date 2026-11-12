@@ -2,6 +2,11 @@
 #include "UI/SGPAAssistantWidget.h"
 
 #include "Application/GPAANativeRuntime.h"
+#include "Application/GPAAQuickStart.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Images/SThrobber.h"
+#include "Styling/CoreStyle.h"
+#include "Brushes/SlateColorBrush.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #include "Editor.h"
@@ -56,6 +61,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
     InitializeSourceOpenerOptions();
     InitializeChatProviderOptions();
     LoadPluginSettings();
+    QuickStart = MakeShared<FGPAAQuickStart>();
 
     ChildSlot
     [
@@ -114,6 +120,9 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                     SAssignNew(StatusText, STextBlock)
                     .Text(LOCTEXT("ReadyStatus", "Ready"))
                 ]
+
+                + SVerticalBox::Slot().AutoHeight().Padding(0,0,0,8)
+                [MakeQuickStartPanel()]
 
                 + SVerticalBox::Slot()
                 .AutoHeight()
@@ -374,6 +383,57 @@ FReply SGPAAssistantWidget::OnSearchClicked()
     StartNative(false); return FReply::Handled();
 }
 
+TSharedRef<SWidget> SGPAAssistantWidget::MakeQuickStartPanel()
+{
+    auto Steps = SNew(SVerticalBox);
+    const TCHAR* Labels[] = {TEXT("1. Set up local AI settings"), TEXT("2. Download and verify the Light model"), TEXT("3. Verify with a local test prompt")};
+    for (int32 I = 0; I < 3; ++I)
+    {
+        Steps->AddSlot().AutoHeight().Padding(0,3)
+        [SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0,0,8,0)
+            [SNew(SOverlay)
+                + SOverlay::Slot()[SNew(SThrobber).NumPieces(3)
+                    .Visibility_Lambda([this,I]() { return QuickStart->Running() && QuickStart->Step == I ? EVisibility::Visible : EVisibility::Hidden; })]
+                + SOverlay::Slot().HAlign(HAlign_Center)[SNew(STextBlock).Text(FText::FromString(TEXT("\u2713")))
+                    .Visibility_Lambda([this,I]() { return QuickStart->Step > I ? EVisibility::Visible : EVisibility::Hidden; })]]
+            + SHorizontalBox::Slot().FillWidth(1)
+            [SNew(STextBlock).Text(FText::FromString(Labels[I]))
+                .ColorAndOpacity_Lambda([this,I]() { return QuickStart->Step >= I ? FSlateColor::UseForeground() : FSlateColor(FLinearColor(.45f,.45f,.45f)); })
+                .StrikeBrush_Lambda([this,I]() -> const FSlateBrush*
+                { static FSlateColorBrush Strike(FLinearColor::White); Strike.ImageSize = FVector2D(1,1); return QuickStart->Step > I ? &Strike : nullptr; })]];
+    }
+    return SNew(SVerticalBox)
+        + SVerticalBox::Slot().AutoHeight()
+        [SNew(SHorizontalBox)
+            + SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Text(LOCTEXT("QuickStartButton", "Quick Start"))
+                .IsEnabled_Lambda([this]() { return !QuickStart->Running() && !bBusy; })
+                .OnClicked(this, &SGPAAssistantWidget::OnQuickStartClicked)]
+            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6,0)
+                [SNew(SImage).Image(FCoreStyle::Get().GetBrush(TEXT("Icons.Help")))
+                    .ToolTipText(LOCTEXT("QuickStartHelp", "Selects Local AI, downloads and verifies the Light Qwen model (about 1.04 GiB, Apache 2.0) from Qwen on Hugging Face, then runs a short local test prompt. Requires internet for the first download and additional disk space/RAM. A verified cached model is reused. No API key or cloud prompt is used. Closing this panel cancels Quick Start."))]
+            + SHorizontalBox::Slot().AutoWidth().Padding(8,0)
+                [SNew(SButton).Text(LOCTEXT("CancelQuickStart", "Cancel"))
+                    .Visibility_Lambda([this]() { return QuickStart->Running() ? EVisibility::Visible : EVisibility::Collapsed; })
+                    .OnClicked_Lambda([this]() { QuickStart->Cancel(); return FReply::Handled(); })]]
+        + SVerticalBox::Slot().AutoHeight()
+            [SNew(SBox).Visibility_Lambda([this]() { return QuickStart->Step >= 0 ? EVisibility::Visible : EVisibility::Collapsed; })[Steps]]
+        + SVerticalBox::Slot().AutoHeight().Padding(0,4)
+            [SNew(STextBlock).AutoWrapText(true)
+                .ColorAndOpacity_Lambda([this]() { return QuickStart->Succeeded() ? FSlateColor(FLinearColor(.25f,.8f,.35f)) : FSlateColor::UseForeground(); })
+                .Text_Lambda([this]() { return FText::FromString(QuickStart->Message); })];
+}
+FReply SGPAAssistantWidget::OnQuickStartClicked()
+{
+    if (QuickStart->Start()) RegisterActiveTimer(.1f, FWidgetActiveTimerDelegate::CreateSP(this, &SGPAAssistantWidget::TickQuickStart));
+    return FReply::Handled();
+}
+EActiveTimerReturnType SGPAAssistantWidget::TickQuickStart(double Time, float Delta)
+{
+    QuickStart->Tick();
+    return QuickStart->Running() ? EActiveTimerReturnType::Continue : EActiveTimerReturnType::Stop;
+}
+
 FReply SGPAAssistantWidget::OnAskClicked()
 {
     StartNative(true); return FReply::Handled();
@@ -381,6 +441,7 @@ FReply SGPAAssistantWidget::OnAskClicked()
 
 SGPAAssistantWidget::~SGPAAssistantWidget()
 {
+    if (QuickStart) QuickStart->Cancel();
     if (bBusy) FGPAANativeRuntime::CancelIfRunning();
 }
 
@@ -395,6 +456,7 @@ FReply SGPAAssistantWidget::OnCancelClicked()
 
 void SGPAAssistantWidget::StartNative(bool Ask)
 {
+    if (FGPAAQuickStart::IsRunning()) { SetResult(false, TEXT("Wait for Quick Start to finish, or cancel it first.")); return; }
     LoadPluginSettings();
     const FString Query = Ask ? GetPromptQuestion() : GetSearchQuery();
     if (Query.TrimStartAndEnd().IsEmpty()) { SetResult(false, TEXT("Enter a question or search query first.")); return; }
@@ -644,10 +706,6 @@ void SGPAAssistantWidget::LoadPluginSettings()
         ChatProviderComboBox->SetSelectedItem(SelectedChatProviderMode);
     }
 
-    if (SettingsSummaryText.IsValid())
-    {
-        SettingsSummaryText->SetText(GetSettingsSummaryText());
-    }
 }
 
 void SGPAAssistantWidget::SavePluginSettings() const
@@ -655,7 +713,6 @@ void SGPAAssistantWidget::SavePluginSettings() const
     UGPAAEditorSettings* Settings = GetMutableDefault<UGPAAEditorSettings>();
     Settings->SourceOpenerMode = SelectedSourceOpenerMode.IsValid() ? *SelectedSourceOpenerMode : SourceOpenerAuto;
     Settings->CustomSourceOpenerCommand = GetSourceOpenerCommand();
-    Settings->ChatProvider = SelectedChatProviderMode.IsValid() ? *SelectedChatProviderMode : Settings->ChatProvider;
     Settings->SaveConfig();
 }
 
@@ -701,10 +758,6 @@ void SGPAAssistantWidget::ApplyChatSettingsResponse(bool bSucceeded, const FStri
     }
 
     StatusText->SetText(FText::FromString(FString::Printf(TEXT("Chat provider active: %s"), *GetSelectedChatProviderName())));
-    if (SettingsSummaryText.IsValid())
-    {
-        SettingsSummaryText->SetText(GetSettingsSummaryText());
-    }
 }
 
 FGPAAChatSettings SGPAAssistantWidget::GetChatSettingsFromUi() const
@@ -785,6 +838,7 @@ FText SGPAAssistantWidget::GetSelectedChatProviderText() const
 FText SGPAAssistantWidget::GetSettingsSummaryText() const
 {
     const auto* Settings=GetDefault<UGPAAEditorSettings>();
+    if (Settings->ChatProvider.IsEmpty()) return LOCTEXT("SetupRequired", "Setup required — use Quick Start or choose an AI provider in Settings. Search is available locally.");
     const FString Model = Settings->ChatProvider == TEXT("Local")
         ? (Settings->LocalModelFile.IsEmpty() ? Settings->LocalModelId : FPaths::GetCleanFilename(Settings->LocalModelFile))
         : Settings->OpenAIModel;

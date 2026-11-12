@@ -13,25 +13,28 @@ class UGPAAEditorSettings final : public UDeveloperSettings
     GENERATED_BODY()
   public:
     UGPAAEditorSettings();
+    virtual void PostInitProperties() override;
+    virtual void PostEditChangeProperty(FPropertyChangedEvent& Event) override;
+    void SelectAI(bool Local);
     UPROPERTY(EditAnywhere, Config, Category = "Project") FString ProjectRootOverride;
-    UPROPERTY(EditAnywhere, Config, Category = "Chat",
-              meta = (GetOptions = "GetChatProviderOptions", ToolTip = "Local runs offline with a downloaded GGUF model; OpenAI and OpenAICompatible use cloud services."))
+    UPROPERTY(Config)
     FString ChatProvider;
-    UPROPERTY(EditAnywhere, Config, Category = "Chat") FString OpenAIBaseUrl;
-    UPROPERTY(EditAnywhere, Config, Category = "Chat") FString OpenAIModel;
+    UPROPERTY(EditAnywhere, Config, Category = "Cloud AI Provider", meta = (GetOptions = "GetChatProviderOptions"))
+    FString CloudProvider = TEXT("OpenAI");
+    UPROPERTY(EditAnywhere, Config, Category = "Cloud AI Provider") FString OpenAIBaseUrl;
+    UPROPERTY(EditAnywhere, Config, Category = "Cloud AI Provider") FString OpenAIModel;
     UPROPERTY(
-        EditAnywhere, Transient, Category = "Chat",
+        EditAnywhere, Transient, Category = "Cloud AI Provider",
         meta =
             (PasswordField = true,
              ToolTip =
                  "Enter your personal key, then click Save Personal Key. It is never saved in project configuration."))
     FString OpenAIApiKey;
-    UPROPERTY(EditAnywhere, Config, Category = "Chat",
-              meta = (ToolTip = "Send your questions and selected project excerpts to your provider. API usage is billed by that provider."))
+    UPROPERTY(Config)
     bool bCloudContextAccepted = false;
-    UPROPERTY(EditAnywhere, Config, Category = "Chat", meta = (ClampMin = "5", ClampMax = "600"))
+    UPROPERTY(EditAnywhere, Config, Category = "Cloud AI Provider", meta = (ClampMin = "5", ClampMax = "600"))
     int32 TimeoutSeconds = 120;
-    UPROPERTY(EditAnywhere, Config, Category = "Chat", meta = (ClampMin = "64", ClampMax = "32768"))
+    UPROPERTY(EditAnywhere, Config, Category = "Cloud AI Provider", meta = (ClampMin = "64", ClampMax = "32768"))
     int32 MaxOutputTokens = 512;
     UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (GetOptions = "GetLocalModelOptions"))
     FString LocalModelId;
@@ -53,8 +56,8 @@ class UGPAAEditorSettings final : public UDeveloperSettings
     UPROPERTY(EditAnywhere, Config, Category = "Source Opener") FString CustomSourceOpenerCommand;
     FString LastKeyResult;
     FString LastProfileResult;
-    UFUNCTION(CallInEditor, Category = "Chat", meta = (DisplayName = "Save Personal Key")) void SavePersonalKey();
-    UFUNCTION(CallInEditor, Category = "Chat", meta = (DisplayName = "Remove Personal Key")) void RemovePersonalKey();
+    UFUNCTION(CallInEditor, Category = "Cloud AI Provider", meta = (DisplayName = "Save Personal Key")) void SavePersonalKey();
+    UFUNCTION(CallInEditor, Category = "Cloud AI Provider", meta = (DisplayName = "Remove Personal Key")) void RemovePersonalKey();
     UFUNCTION(CallInEditor, Category = "Import / Export") void ExportSettingsProfile();
     UFUNCTION(CallInEditor, Category = "Import / Export") void ImportSettingsProfile();
     bool ExportSettingsProfileToFile(const FString& Path);

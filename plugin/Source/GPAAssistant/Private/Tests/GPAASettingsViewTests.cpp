@@ -61,11 +61,13 @@ bool FGPAAWaitForSettingsActions::Update()
     Test->TestFalse(TEXT("Personal settings do not force shared default config"),
         UGPAAEditorSettings::StaticClass()->HasAnyClassFlags(CLASS_DefaultConfig));
     Test->TestTrue(TEXT("Local model download action available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Download Selected Model")));
+    Test->TestTrue(TEXT("Local AI choice is visible"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Local AI")));
+    Test->TestTrue(TEXT("Cloud AI choice is visible"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Cloud AI Provider")));
     Test->TestTrue(TEXT("Existing GGUF selection available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Use Downloaded Model")));
     Test->TestTrue(TEXT("Export action remains available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Export Settings Profile")));
     Test->TestTrue(TEXT("Import action remains available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Import Settings Profile")));
     for (const TCHAR* Removed : {TEXT("Check Assistant"), TEXT("Test Prompt IA (Billable)"),
-        TEXT("Import Legacy Chat History"), TEXT("Export Profile Path"), TEXT("Import Profile Path"), TEXT("Legacy History Path")})
+        TEXT("Import Legacy Chat History"), TEXT("Export Profile Path"), TEXT("Import Profile Path"), TEXT("Legacy History Path"), TEXT("Cloud Context Accepted")})
         Test->TestFalse(Removed, ContainsSettingsText(State->View.ToSharedRef(), Removed));
     State->Window->RequestDestroyWindow();
     return true;

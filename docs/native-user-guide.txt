@@ -16,7 +16,13 @@ Keep a single active copy: choose either a project or an engine installation for
 
 Open Tools > Game Production AI Assistant. The panel has Prompt IA, Search, History and Settings.
 
-## Local search
+## First-time setup and Quick Start
+
+A fresh installation has neither AI radio selected. Search works before AI setup. Existing installations retain their selected provider. Settings are ordered AI Setup, Cloud AI Provider, Local AI, Project, Import / Export, and Source Opener. Help icons explain provider choices, the model catalogue and Project Root Override.
+
+Click Quick Start in the assistant panel to select Local AI, choose the Light Qwen model, download and verify it (about 1.04 GiB on the first run), and run a real local test prompt. A verified cached model is reused. Three steps show animated progress, dimmed pending steps, and checked/struck-through completed steps. Success confirms that Prompt IA is ready for local generation and Search is available without AI generation. No key or cloud prompt is involved. Cancel or close the panel to stop; retry to resume a partial download. Setup leaves the Local settings selected even if the later download or test fails; the displayed error explains why it is not ready. The test uses no project content and is not added to history.
+
+Local search
 
 Indexing starts automatically after Unreal finishes discovering assets, refreshes before each question or search, and runs every minute while idle. The first index can take longer. The panel does not need to remain open for periodic indexing.
 
@@ -28,7 +34,7 @@ The plugin searches source files and Asset Registry metadata. It does not inspec
 
 ## Local chat setup
 
-1. In Settings, select Chat Provider: Local.
+1. In Settings, select Local AI in AI Setup.
 2. Under Local AI, choose a Local Model Id. Start with qwen2.5-coder-1.5b-q4km (Qwen2.5 Coder 1.5B Instruct Q4_K_M, approximately 1.04 GiB). The larger 7B option is approximately 4.36 GiB and needs substantially more RAM and CPU time; its performance is not validated by the light-model benchmark.
 3. Read the displayed source, license and size, then click Download Selected Model. This explicitly downloads public model weights from Qwen on Hugging Face. Download progress appears in Settings. Cancel Download retains partial data; clicking Download again resumes it. A SHA256 check must pass before the model becomes available.
 4. Alternatively, Browse... to an existing compatible instruction GGUF file. Use Downloaded Model clears this override. Arbitrary model architectures/templates are not guaranteed to work.
@@ -44,10 +50,10 @@ A final reference check flags common generated paths that were absent from the s
 
 ## Cloud chat setup
 
-1. Open Settings and select a Chat Provider. OpenAI uses Responses; OpenAICompatible uses streaming Chat Completions.
+1. Open Settings and select Cloud AI Provider in AI Setup, then choose the cloud service in the Cloud AI Provider section. OpenAI uses Responses; OpenAICompatible uses streaming Chat Completions.
 2. Set the provider base URL and a model available to your account. For OpenAI, the base URL is https://api.openai.com/v1. The plugin appends the API route.
 3. Paste your personal API key into the masked field and click Save Personal Key beside it. Entering a key alone does not save it. On success, the input clears and a confirmation appears.
-4. Review and enable Cloud Context Accepted if you agree to send your question and selected project excerpts to that provider. Provider charges and data policies apply.
+4. Selecting the Cloud AI Provider radio button authorizes sending questions and selected project excerpts to that provider. Provider charges and data policies apply; there is no separate consent checkbox.
 5. Return to Prompt IA, enter your question in Prompt your AI here, and click Send. Responses appear progressively. Inspect referenced files and assets to verify the answer.
 
 Cancel appears beside Send or Search while the action is cancellable. An interrupted response can remain in history. Cancellation cannot undo data already sent or guarantee that a provider will not charge for work already performed.
@@ -58,7 +64,7 @@ Local search is independent of cloud chat. Select Local to generate answers on t
 
 History shows prompts (with provider/model identity for new entries) and completed searches, including search scope and references. Empty-result searches are recorded; automatic indexing is not. Back returns to the selected view. History persists between editor sessions.
 
-Export Settings Profile opens a native save dialog for a JSON file. Import Settings Profile opens a native file picker. Cancel either dialog to leave settings and files unchanged. Profiles contain provider/model, local CPU/context budgets and source-opening preferences, exclude keys, history and machine-specific GGUF paths, and reset cloud consent when imported. Files over 1 MiB or malformed JSON are rejected. There are no editable path fields or legacy-history import button.
+Export Settings Profile opens a native save dialog for a JSON file. Import Settings Profile opens a native file picker. Cancel either dialog to leave settings and files unchanged. Profiles contain provider/model, local CPU/context budgets and source-opening preferences, exclude keys, history and machine-specific GGUF paths, and require selecting the Cloud AI Provider radio again after importing cloud settings. Files over 1 MiB or malformed JSON are rejected. There are no editable path fields or legacy-history import button.
 
 Source Opener Auto uses the available source-navigation integration. A custom command supports {file} and {line} placeholders. Project Root Override is an advanced option: leave it empty to index the current project.
 

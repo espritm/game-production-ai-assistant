@@ -10,10 +10,15 @@ param(
     [switch] $InteractiveAssetEditor,
     [switch] $HttpShutdownAcceptance,
     [switch] $LocalAIAcceptance,
+    [switch] $QuickStartAcceptance,
     [switch] $LocalOfflineOnly,
     [string] $LocalModelCache
 )
 $ErrorActionPreference = 'Stop'
+if ($QuickStartAcceptance) {
+    if ($LocalAIAcceptance -or $HttpShutdownAcceptance -or $AcceptanceProject) { throw 'Quick Start acceptance must run in isolation.' }
+    $TestFilter='GPAA.Acceptance.QuickStart'
+}
 if($LocalOfflineOnly -and !$LocalAIAcceptance){throw 'LocalOfflineOnly requires LocalAIAcceptance.'}
 if ($HttpShutdownAcceptance) {
     if ($AcceptanceProject -or $InteractiveAssetEditor) { throw 'HTTP shutdown acceptance must run in isolation.' }
@@ -72,6 +77,7 @@ $args = @('"' + (Join-Path $projectRoot 'Host.uproject') + '"', '-unattended','-
 if ($AcceptanceProject) { $args += '-GPAARealAssets' }
 if ($InteractiveAssetEditor) { $args += '-GPAAInteractiveAssetTest' }
 if ($HttpShutdownAcceptance) { $args += '-GPAAHttpShutdownAcceptance' }
+if ($QuickStartAcceptance) { $args += '-GPAAQuickStartAcceptance' }
 if ($LocalAIAcceptance) {
     if (!$LocalModelCache) {$LocalModelCache=Join-Path $root '.gpaa\local-ai\models'}
     $args += '-GPAALocalAcceptance'
@@ -91,8 +97,10 @@ try {
     }
     $requiredTests=@('GPAA.Native.UI.ContextualCancellation','GPAA.Native.Storage.MixedHistoryMigration','GPAA.Native.UI.SegmentedViewSelection','GPAA.Native.UI.SearchScopeRadios','GPAA.Native.Workflow.ScopedAssetSearch','GPAA.Native.UI.PromptBottomAlignment','GPAA.Native.UI.HistoryExclusiveView','GPAA.Native.Workflow.BackgroundIndexNonPreemptive','GPAA.Native.UI.SettingsCredentialActions','GPAA.Native.Cloud.StreamingBoundaries','GPAA.Native.Cloud.HttpContract.Responses','GPAA.Native.Cloud.HttpContract.ChatCompletions','GPAA.Native.Embeddings.Corpus','GPAA.Native.Storage.AtomicRollbackAndHistory','GPAA.Native.Workflow.OfflineIndexAndSearch')
     $requiredTests+=@('GPAA.Native.LocalAI.EmptyEvidenceGuard','GPAA.Native.LocalAI.StreamingUtf8','GPAA.Native.LocalAI.ModelIntegrity','GPAA.Native.LocalAI.NoCloudFallback','GPAA.Native.LocalAI.PortableProfiles')
+    $requiredTests+='GPAA.Native.Setup.ExplicitProviderChoice'
     if ($LocalAIAcceptance) { $requiredTests=@('GPAA.Acceptance.LocalAI.DownloadResumeAndGeneration') }
     if ($HttpShutdownAcceptance) { $requiredTests=@('GPAA.Acceptance.HttpShutdown.PendingAndLateRequests') }
+    if ($QuickStartAcceptance) { $requiredTests=@('GPAA.Acceptance.QuickStart.CachedModelAndRealPrompt') }
     foreach ($test in $requiredTests) {
         if (@($result.tests | Where-Object { $_.fullTestPath -eq $test -and $_.state -eq 'Success' }).Count -ne 1) { throw "Required native test missing: $test" }
     }

@@ -54,3 +54,7 @@ The original 0.2.0 Fab dossier is kept as a separate immutable artifact. The 0.3
 Windows archive SHA256: UE 5.8 `6DDDC18A8E4F6FBEAC9F6692FF9DE347D730C6A40005D2499BC7DB885551765A`; UE 5.6 `E58BC5B1E4BC90668225C9CFEBC2C055D3C4D7EB341B52AC5762BF7B258E155F`.
 
 Path checks do not evaluate every semantic claim. The French fixture identified the correct file but described stamina in health-related terms, illustrating the small model's limits. Native UI acceptance and an independent-machine check of 0.3.0 remain separate from the previous 0.2.0 acceptance. No desktop control or paid cloud call was used for this implementation's validation.
+
+## Guided setup
+
+Fresh settings leave ChatProvider empty. Explicit Local/Cloud radios choose the active provider; cloud selection authorizes context sharing. The old consent config key is retained only for compatibility and is hidden/ignored. Cloud profile import requires an explicit new Cloud selection. Quick Start configures Local and the pinned Light model, polls structured download success, and runs a real short local generation without project data or history writes. The panel owns cancellation and the game-thread controller; weak callbacks prevent access after it closes. `scripts/test-native-plugin.ps1 -QuickStartAcceptance` tests the controller with an already cached Light model, without downloading weights.

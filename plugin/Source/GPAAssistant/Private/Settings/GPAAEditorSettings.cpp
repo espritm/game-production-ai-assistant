@@ -14,12 +14,30 @@
 
 UGPAAEditorSettings::UGPAAEditorSettings()
 {
-    ChatProvider = TEXT("OpenAI");
+    ChatProvider.Reset();
     LocalModelId = TEXT("qwen2.5-coder-1.5b-q4km");
     OpenAIBaseUrl = TEXT("https://api.openai.com/v1");
     OpenAIModel = TEXT("gpt-4.1-mini");
     SourceOpenerMode = TEXT("Auto");
     CustomSourceOpenerCommand = TEXT("code -g \"{file}:{line}\"");
+}
+void UGPAAEditorSettings::PostInitProperties()
+{
+    Super::PostInitProperties();
+    if (ChatProvider == TEXT("OpenAI") || ChatProvider == TEXT("OpenAICompatible")) CloudProvider = ChatProvider;
+}
+void UGPAAEditorSettings::SelectAI(bool Local)
+{
+    ChatProvider = Local ? TEXT("Local") : CloudProvider;
+    bCloudContextAccepted = !Local;
+    SaveConfig();
+}
+void UGPAAEditorSettings::PostEditChangeProperty(FPropertyChangedEvent& Event)
+{
+    if (Event.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UGPAAEditorSettings, CloudProvider) &&
+        !ChatProvider.IsEmpty() && ChatProvider != TEXT("Local")) ChatProvider = CloudProvider;
+    Super::PostEditChangeProperty(Event);
+    SaveConfig();
 }
 FString UGPAAEditorSettings::GetResolvedProjectRoot() const
 {
@@ -112,6 +130,7 @@ bool UGPAAEditorSettings::ExportSettingsProfileToFile(const FString& Path)
 {
     auto Json = MakeShared<FJsonObject>();
     Json->SetStringField(TEXT("chatProvider"), ChatProvider);
+    Json->SetStringField(TEXT("cloudProvider"), CloudProvider);
     Json->SetStringField(TEXT("openAIBaseUrl"), OpenAIBaseUrl);
     Json->SetStringField(TEXT("openAIModel"), OpenAIModel);
     Json->SetStringField(TEXT("localModelId"), LocalModelId);
@@ -145,6 +164,11 @@ bool UGPAAEditorSettings::ImportSettingsProfileFromFile(const FString& Path)
             Value = Candidate;
     };
     Read(TEXT("chatProvider"), ChatProvider);
+    Read(TEXT("cloudProvider"), CloudProvider);
+    if (ChatProvider == TEXT("OpenAI") || ChatProvider == TEXT("OpenAICompatible"))
+    { CloudProvider = ChatProvider; ChatProvider.Reset(); }
+    else if (ChatProvider != TEXT("Local")) ChatProvider.Reset();
+    if (CloudProvider != TEXT("OpenAICompatible")) CloudProvider = TEXT("OpenAI");
     Read(TEXT("openAIBaseUrl"), OpenAIBaseUrl);
     Read(TEXT("openAIModel"), OpenAIModel);
     FString ModelId;
@@ -161,12 +185,12 @@ bool UGPAAEditorSettings::ImportSettingsProfileFromFile(const FString& Path)
     bCloudContextAccepted = false;
     SaveConfig();
     LastProfileResult =
-        TEXT("Profile imported. Keys were ignored; review the provider and enable cloud consent again.");
+        TEXT("Profile imported without keys. Select Cloud AI Provider to authorize cloud context if needed.");
     return true;
 }
 
 TArray<FString> UGPAAEditorSettings::GetChatProviderOptions() const
-{ return {TEXT("Local"), TEXT("OpenAI"), TEXT("OpenAICompatible")}; }
+{ return {TEXT("OpenAI"), TEXT("OpenAICompatible")}; }
 TArray<FString> UGPAAEditorSettings::GetLocalModelOptions() const
 { TArray<FString> Result; for (const auto& Model : FGPAALocalModels::Catalogue()) Result.Add(Model.Id); return Result; }
 void UGPAAEditorSettings::DownloadLocalModel() { FGPAALocalModels::Get().Download(LocalModelId); }

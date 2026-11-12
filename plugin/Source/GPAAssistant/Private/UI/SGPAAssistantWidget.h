@@ -16,6 +16,7 @@ class SMultiLineEditableTextBox;
 class STableViewBase;
 class STextBlock;
 class SWidgetSwitcher;
+class FGPAAQuickStart;
 enum class ECheckBoxState : uint8;
 class ITableRow;
 template<typename OptionType> class SSegmentedControl;
@@ -30,6 +31,10 @@ public:
     virtual ~SGPAAssistantWidget() override;
 
 private:
+    TSharedPtr<FGPAAQuickStart> QuickStart;
+    TSharedRef<SWidget> MakeQuickStartPanel();
+    FReply OnQuickStartClicked();
+    EActiveTimerReturnType TickQuickStart(double Time, float Delta);
     friend class FGPAAHistoryLayoutTest;
     friend class FGPAAPromptLayoutTest;
     friend class FGPAASearchLayoutTest;

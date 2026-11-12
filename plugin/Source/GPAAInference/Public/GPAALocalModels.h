@@ -25,6 +25,7 @@ public:
     bool Remove(const FString& Id);
     void Cancel();
     bool IsBusy() const;
+    bool LastDownloadSucceeded() const { return DownloadSucceeded.Load(); }
     FString Status() const;
     void Shutdown();
 private:
@@ -33,5 +34,6 @@ private:
     FGPAATaskPtr Task;
     TFuture<void> Work;
     bool Stopping = false;
+    TAtomic<bool> DownloadSucceeded{false};
     void SetStatus(const FString& Value);
 };
