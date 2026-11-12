@@ -16,6 +16,8 @@ class SMultiLineEditableTextBox;
 class STableViewBase;
 class STextBlock;
 class SWidgetSwitcher;
+class SScrollBox;
+class SVerticalBox;
 class FGPAAQuickStart;
 enum class ECheckBoxState : uint8;
 class ITableRow;
@@ -33,6 +35,7 @@ public:
 private:
     TSharedPtr<FGPAAQuickStart> QuickStart;
     TSharedRef<SWidget> MakeQuickStartPanel();
+    EVisibility GetQuickStartButtonVisibility() const;
     FReply OnQuickStartClicked();
     EActiveTimerReturnType TickQuickStart(double Time, float Delta);
     friend class FGPAAHistoryLayoutTest;
@@ -52,7 +55,8 @@ private:
     void FinishPromptTurn(const FString& Answer);
     FString ConversationText, ActivePrompt;
     bool bPromptTurnActive = false;
-    TSharedPtr<SWidgetSwitcher> MainViewSwitcher;
+    TSharedPtr<SScrollBox> ThreadScroll;
+    TSharedPtr<SVerticalBox> ThreadMessages;
     FReply OnCancelClicked();
     void StartNative(bool Ask);
     FGuid NativeRequestId;
@@ -60,8 +64,6 @@ private:
     FReply OnOpenSettingsClicked();
     FReply OnLoadChatSettingsClicked();
     FReply OnSaveChatSettingsClicked();
-    FReply OnHistoryClicked();
-    FReply OnCloseHistoryClicked();
     FReply OnPromptTabClicked();
     FReply OnSearchTabClicked();
     FReply OnSearchClicked();
@@ -70,7 +72,6 @@ private:
     void SetBusy(const FString& Message);
     void SetBusyFromWorkflow(bool bSucceeded, const FString& Message);
     void SetResult(bool bSucceeded, const FString& Message);
-    void SetHistoryResult(bool bSucceeded, const FString& Message);
     void SetSearchResult(bool bSucceeded, const FString& Message, const TArray<FGPAASourceReference>& Results);
     void SetChatResult(bool bSucceeded, const FString& Message, const FString& Answer, const TArray<FGPAASourceReference>& Sources);
     TSharedRef<ITableRow> GenerateSourceRow(TSharedPtr<FGPAASourceReference> Item, const TSharedRef<STableViewBase>& OwnerTable);
@@ -117,7 +118,6 @@ private:
     TSharedPtr<STextBlock> SettingsSummaryText;
     TSharedPtr<STextBlock> SearchSummaryText;
     TSharedPtr<SMultiLineEditableTextBox> AnswerTextBox;
-    TSharedPtr<SMultiLineEditableTextBox> HistoryTextBox;
     TSharedPtr<SListView<TSharedPtr<FGPAASourceReference>>> SearchResultsListView;
     TArray<TSharedPtr<FString>> SourceOpenerModes;
     TSharedPtr<FString> SelectedSourceOpenerMode;

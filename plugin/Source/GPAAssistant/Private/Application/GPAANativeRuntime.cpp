@@ -307,18 +307,6 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
                                      });
                 if (Ok && !RefreshOnly)
                     Ok = FGPAACore::Search(Query, SearchScope, 8, *Self->Embeddings, Store, Task, Sources, Error);
-                if (Ok && !Ask && !RefreshOnly && !Task->Cancelled.Load())
-                {
-                    TArray<TSharedPtr<FJsonValue>> References;
-                    for (const auto& Source : Sources)
-                        References.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("%s:%d-%d (score %.3f)"),
-                            *Source.Path, Source.FirstLine, Source.LastLine, Source.Score)));
-                    FString Json, StorageError;
-                    FJsonSerializer::Serialize(References, TJsonWriterFactory<>::Create(&Json));
-                    if (!Store.AddHistory(Query, FString::Printf(TEXT("%d result(s)."), Sources.Num()), true,
-                            StorageError, Json, TEXT("Search"), SearchScope))
-                        Error = TEXT("Search complete, but local history could not be saved: ") + StorageError;
-                }
                 if (Ok && Ask)
                 {
                     int32 Characters = 0, Keep = 0;
@@ -404,44 +392,5 @@ void FGPAANativeRuntime::Run(const FString &ProjectRoot, const FString &AssetSna
                                 });
                         });
                 });
-        }));
-}
-void FGPAANativeRuntime::LoadHistory(const FString &ProjectRoot, TFunction<void(bool, const FString &)> OnFinished)
-{
-    auto Self = AsShared();
-    Jobs.Add(Async(EAsyncExecution::ThreadPool,
-                   [Self, ProjectRoot, OnFinished]()
-                   {
-                       FString Error, History;
-                       {
-                           FScopeLock Lock(&Self->IndexMutex);
-                           FGPAANativeStorage Store(DatabasePath(ProjectRoot));
-                           History = Store.History(Error);
-                       }
-                       AsyncTask(ENamedThreads::GameThread, [OnFinished, Error, History]()
-                                 { OnFinished(Error.IsEmpty(), Error.IsEmpty() ? History : Error); });
-                   }));
-}
-void FGPAANativeRuntime::ImportHistory(const FString &ProjectRoot, const FString &JsonPath,
-                                       TFunction<void(bool, const FString &)> OnFinished)
-{
-    auto Self = AsShared();
-    Jobs.Add(Async(
-        EAsyncExecution::ThreadPool,
-        [Self, ProjectRoot, JsonPath, OnFinished]()
-        {
-            FString Error;
-            bool Ok;
-            {
-                FScopeLock Lock(&Self->IndexMutex);
-                FGPAANativeStorage Store(DatabasePath(ProjectRoot));
-                Ok = Store.ImportLegacyHistory(JsonPath, Error);
-            }
-            AsyncTask(ENamedThreads::GameThread,
-                      [OnFinished, Ok, Error]()
-                      {
-                          OnFinished(Ok, Ok ? TEXT("Legacy history imported. Keys and embeddings were not imported.")
-                                            : Error);
-                      });
         }));
 }

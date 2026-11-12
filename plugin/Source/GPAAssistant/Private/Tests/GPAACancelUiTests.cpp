@@ -40,8 +40,6 @@ bool FGPAACancelUiTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Busy alone does not expose cancellation"),Panel->GetRequestCancelVisibility(false)==EVisibility::Collapsed);
     Panel->bCancellable=true; Panel->bRequestIsAsk=true;
     TestTrue(TEXT("Only Send cancellation is visible during prompt request"),Panel->GetRequestCancelVisibility(true)==EVisibility::Visible && Panel->GetRequestCancelVisibility(false)==EVisibility::Collapsed);
-    Panel->SetHistoryResult(true,TEXT("history"));
-    TestTrue(TEXT("History load cannot clear live prompt cancellation"),Panel->GetRequestCancelVisibility(true)==EVisibility::Visible);
     Panel->bRequestIsAsk=false;
     TestTrue(TEXT("Only Search cancellation is visible during search"),Panel->GetRequestCancelVisibility(false)==EVisibility::Visible && Panel->GetRequestCancelVisibility(true)==EVisibility::Collapsed);
     Panel->OnCancelClicked();

@@ -7,6 +7,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Layout/ArrangedChildren.h"
 #include "Layout/Children.h"
+#include "Widgets/SBoxPanel.h"
 
 namespace
 {
@@ -32,33 +33,29 @@ bool FGPAAPromptLayoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Prompt hint matches requested copy"), Panel->PromptQuestionTextBox->GetHintText().ToString(), FString(TEXT("Prompt your AI here")));
     TestFalse(TEXT("Redundant prompt and answer labels removed"), HasOldPromptLabel(Panel));
     Panel->SetAnswerText(TEXT("A short answer."));
-    Panel->AnswerTextBox->SlatePrepass();
-    const FGeometry Viewport = FGeometry::MakeRoot(FVector2D(600, 400), FSlateLayoutTransform());
-    FArrangedChildren Short(EVisibility::Visible);
-    Panel->AnswerTextBox->ArrangeChildren(Viewport, Short);
-    TestEqual(TEXT("Answer content has one bordered child"), Short.Num(), 1);
-    if (Short.Num() == 1)
-        TestTrue(TEXT("Short answer is arranged at the bottom of the full-height frame"), Short[0].Geometry.GetAbsolutePosition().Y > 300);
+    const auto FirstAnswer = Panel->AnswerTextBox;
     FString LongAnswer;
-    for (int32 I = 0; I < 300; ++I) LongAnswer += TEXT("A longer streamed answer remains selectable and scrollable.\n");
+    for (int32 I = 0; I < 300; ++I) LongAnswer += TEXT("A longer streamed answer remains selectable.\n");
     Panel->SetAnswerText(LongAnswer);
-    Panel->AnswerTextBox->SlatePrepass();
-    FArrangedChildren Long(EVisibility::Visible);
-    Panel->AnswerTextBox->ArrangeChildren(Viewport, Long);
-    TestEqual(TEXT("Long answer text retained in full"), Panel->AnswerTextBox->GetText().ToString(), LongAnswer);
-    if (Long.Num() == 1)
-        TestTrue(TEXT("Long content is constrained to its viewport"), Long[0].Geometry.GetLocalSize().Y <= 400);
+    TestEqual(TEXT("Long answers are retained"), Panel->AnswerTextBox->GetText().ToString(), LongAnswer);
     Panel->PromptQuestionTextBox->SetText(FText::FromString(TEXT("First question")));
     Panel->BeginPromptTurn(Panel->GetPromptQuestion());
     TestTrue(TEXT("Sending clears the input"), Panel->GetPromptQuestion().IsEmpty());
     Panel->NativeAnswer = TEXT("First streamed answer"); Panel->RenderPromptTurn();
-    TestTrue(TEXT("Submitted question remains visible during streaming"), Panel->AnswerTextBox->GetText().ToString().Contains(TEXT("You:\nFirst question")));
+    TestEqual(TEXT("User and AI have separate message rows"), Panel->ThreadMessages->NumSlots(), 3);
+    Panel->ThreadMessages->SlatePrepass();
+    FArrangedChildren Rows(EVisibility::Visible);
+    Panel->ThreadMessages->ArrangeChildren(FGeometry::MakeRoot(FVector2D(800,1200), FSlateLayoutTransform()), Rows);
+    TestEqual(TEXT("All message rows are arranged"), Rows.Num(), 3);
+    if (Rows.Num() == 3) TestTrue(TEXT("User prompt is aligned to the right"), Rows[1].Geometry.GetAbsolutePosition().X > 0);
+    const auto FirstTurnAnswer = Panel->AnswerTextBox;
     Panel->SetChatResult(true, TEXT("Complete"), TEXT("First complete answer"), {});
     Panel->BeginPromptTurn(TEXT("Second question"));
     Panel->NativeAnswer = TEXT("Second partial answer"); Panel->RenderPromptTurn();
-    const FString Stream = Panel->AnswerTextBox->GetText().ToString();
-    TestTrue(TEXT("Second response preserves the previous turn"), Stream.Contains(TEXT("First complete answer")) && Stream.Contains(TEXT("Second question")) && Stream.Contains(TEXT("Second partial answer")));
-    TestFalse(TEXT("Completed turn replaces its streaming draft"), Stream.Contains(TEXT("First streamed answer")));
+    TestEqual(TEXT("Previous answer widget retains the completed response"), FirstTurnAnswer->GetText().ToString(), FString(TEXT("First complete answer")));
+    TestTrue(TEXT("New response uses its own widget"), Panel->AnswerTextBox != FirstTurnAnswer);
+    TestEqual(TEXT("Both prompt/answer pairs remain in the thread"), Panel->ThreadMessages->NumSlots(), 5);
+    TestEqual(TEXT("Only the active response streams"), Panel->AnswerTextBox->GetText().ToString(), FString(TEXT("Second partial answer")));
     Panel->SetChatResult(false, TEXT("Test interruption"), TEXT("Second partial answer"), {});
     TestTrue(TEXT("Interrupted response remains in the thread"), Panel->AnswerTextBox->GetText().ToString().Contains(TEXT("Second partial answer\n\n[Interrupted] Test interruption")));
     const FString Thread = Panel->AnswerTextBox->GetText().ToString();

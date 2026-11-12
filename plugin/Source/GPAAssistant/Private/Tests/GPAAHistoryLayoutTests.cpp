@@ -6,6 +6,14 @@
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Layout/Children.h"
+#include "Settings/GPAAEditorSettings.h"
+#include "ISettingsModule.h"
+#include "ISettingsContainer.h"
+#include "ISettingsCategory.h"
+#include "ISettingsSection.h"
+#include "Modules/ModuleManager.h"
+#include "Serialization/ObjectWriter.h"
+#include "Serialization/ObjectReader.h"
 
 namespace
 {
@@ -14,7 +22,7 @@ bool HasObsoleteKnowledgeControl(const TSharedRef<SWidget>& Widget)
     if (Widget->GetTypeAsString() == TEXT("STextBlock"))
     {
         const FString Text = StaticCastSharedRef<STextBlock>(Widget)->GetText().ToString();
-        if (Text == TEXT("Refresh Knowledge") || Text == TEXT("Project Knowledge")) return true;
+        if (Text == TEXT("Refresh Knowledge") || Text == TEXT("Project Knowledge") || Text == TEXT("History")) return true;
     }
     auto* Children = Widget->GetChildren();
     for (int32 I = 0; I < Children->Num(); ++I)
@@ -22,7 +30,7 @@ bool HasObsoleteKnowledgeControl(const TSharedRef<SWidget>& Widget)
     return false;
 }
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGPAAHistoryLayoutTest, "GPAA.Native.UI.HistoryExclusiveView",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGPAAHistoryLayoutTest, "GPAA.Native.UI.SetupVisibilityAndNoHistory",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FGPAAHistoryLayoutTest::RunTest(const FString& Parameters)
 {
@@ -30,11 +38,27 @@ bool FGPAAHistoryLayoutTest::RunTest(const FString& Parameters)
     Panel->PromptQuestionTextBox->SetText(FText::FromString(TEXT("Keep my question")));
     Panel->OnSearchTabClicked();
     TestFalse(TEXT("Manual refresh and knowledge panel are removed"), HasObsoleteKnowledgeControl(Panel));
-    Panel->OnHistoryClicked();
-    TestEqual(TEXT("History replaces the entire main view"), Panel->MainViewSwitcher->GetActiveWidgetIndex(), 1);
-    Panel->OnCloseHistoryClicked();
-    TestEqual(TEXT("Back restores the main view"), Panel->MainViewSwitcher->GetActiveWidgetIndex(), 0);
-    TestEqual(TEXT("Search tab selection is preserved"), Panel->TabSwitcher->GetActiveWidgetIndex(), 1);
+    auto* Settings = GetMutableDefault<UGPAAEditorSettings>();
+    TArray<uint8> Snapshot;
+    FObjectWriter Backup(Settings, Snapshot);
+    Settings->SelectAI(true);
+    TestTrue(TEXT("Quick Start is hidden with Local configured"), Panel->GetQuickStartButtonVisibility() == EVisibility::Collapsed);
+    Settings->SelectAI(false);
+    TestTrue(TEXT("Quick Start is hidden with Cloud configured"), Panel->GetQuickStartButtonVisibility() == EVisibility::Collapsed);
+    TestFalse(TEXT("Configured local mode requires no setup"), Settings->ChatProvider.IsEmpty());
+    auto Container = FModuleManager::LoadModuleChecked<ISettingsModule>(TEXT("Settings")).GetContainer(TEXT("Project"));
+    auto Category = Container ? Container->GetCategory(TEXT("Plugins")) : nullptr;
+    auto Section = Category ? Category->GetSection(TEXT("GameProductionAIAssistant")) : nullptr;
+    TestTrue(TEXT("Native Settings section is registered"), Section.IsValid());
+    if (Section)
+    {
+        TestTrue(TEXT("Native reset succeeds"), Section->ResetDefaults());
+        TestTrue(TEXT("Reset clears both AI radio choices"), Settings->ChatProvider.IsEmpty());
+        TestTrue(TEXT("Quick Start returns after native reset"), Panel->GetQuickStartButtonVisibility() == EVisibility::Visible);
+    }
+    FObjectReader Restore(Settings, Snapshot);
+    Settings->SaveConfig();
+    TestFalse(TEXT("History button and old knowledge controls are absent"), HasObsoleteKnowledgeControl(Panel));
     TestEqual(TEXT("Question text is preserved"), Panel->GetPromptQuestion(), FString(TEXT("Keep my question")));
     return true;
 }

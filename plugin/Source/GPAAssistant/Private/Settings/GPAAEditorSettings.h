@@ -16,6 +16,7 @@ class UGPAAEditorSettings final : public UDeveloperSettings
     virtual void PostInitProperties() override;
     virtual void PostEditChangeProperty(FPropertyChangedEvent& Event) override;
     void SelectAI(bool Local);
+    void ResetToDefaults();
     UPROPERTY(EditAnywhere, Config, Category = "Project") FString ProjectRootOverride;
     UPROPERTY(Config)
     FString ChatProvider;

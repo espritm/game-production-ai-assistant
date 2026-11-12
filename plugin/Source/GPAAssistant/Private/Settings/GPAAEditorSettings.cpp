@@ -32,6 +32,19 @@ void UGPAAEditorSettings::SelectAI(bool Local)
     bCloudContextAccepted = !Local;
     SaveConfig();
 }
+void UGPAAEditorSettings::ResetToDefaults()
+{
+    ChatProvider.Reset(); CloudProvider = TEXT("OpenAI"); bCloudContextAccepted = false;
+    ProjectRootOverride.Reset(); OpenAIApiKey.Reset();
+    OpenAIBaseUrl = TEXT("https://api.openai.com/v1"); OpenAIModel = TEXT("gpt-4.1-mini");
+    TimeoutSeconds = 120; MaxOutputTokens = 512;
+    LocalModelId = TEXT("qwen2.5-coder-1.5b-q4km"); LocalModelFile.Reset();
+    LocalContextTokens = 4096; LocalThreads = 4;
+    SourceOpenerMode = TEXT("Auto"); CustomSourceOpenerCommand = TEXT("code -g \"{file}:{line}\"");
+    LastProfileResult.Reset(); LastProfileDirectory.Reset();
+    LastKeyResult = TEXT("Settings reset. Stored personal keys and downloaded models were not removed.");
+    SaveConfig();
+}
 void UGPAAEditorSettings::PostEditChangeProperty(FPropertyChangedEvent& Event)
 {
     if (Event.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UGPAAEditorSettings, CloudProvider) &&

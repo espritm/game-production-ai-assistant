@@ -14,13 +14,13 @@ Manual binary ZIP: close Unreal, extract the matching `Win64.zip` into `<Project
 
 Keep a single active copy: choose either a project or an engine installation for normal use. Update only while Unreal is closed, with a backup of your project. Opening a matching precompiled package should not require compiling the plugin yourself.
 
-Open **Tools > Game Production AI Assistant**. The panel has **Prompt IA**, **Search**, **History** and **Settings**.
+Open **Tools > Game Production AI Assistant**. The panel has **Prompt IA**, **Search** and **Settings**.
 
 ## First-time setup and Quick Start
 
 A fresh installation has neither AI radio selected. Search works before AI setup. Existing installations retain their selected provider. Settings are ordered AI Setup, Cloud AI Provider, Local AI, Project, Import / Export, and Source Opener. Help icons explain provider choices, the model catalogue and Project Root Override.
 
-Click Quick Start in the assistant panel to select Local AI, choose the Light Qwen model, download and verify it (about 1.04 GiB on the first run), and run a real local test prompt. A verified cached model is reused. Three steps show animated progress, dimmed pending steps, and checked/struck-through completed steps. Success confirms that Prompt IA is ready for local generation and Search is available without AI generation. No key or cloud prompt is involved. Cancel or close the panel to stop; retry to resume a partial download. Setup leaves the Local settings selected even if the later download or test fails; the displayed error explains why it is not ready. The test uses no project content and is not added to history.
+Click Quick Start in the assistant panel to select Local AI, choose the Light Qwen model, download and verify it (about 1.04 GiB on the first run), and run a real local test prompt. A verified cached model is reused. Three steps show animated progress, dimmed pending steps, and checked/struck-through completed steps. Success confirms that Prompt IA is ready for local generation and Search is available without AI generation. No key or cloud prompt is involved. Cancel or close the panel to stop; retry to resume a partial download. A failed or cancelled Quick Start clears its own incomplete Local selection so the button is available again; the displayed error explains why it is not ready. The test uses no project content and is not added to history.
 
 ## Local search
 
@@ -60,9 +60,9 @@ A final reference check flags common generated paths that were absent from the s
 
 Local search is independent of cloud chat. Select Local to generate answers on the PC instead. Compatible endpoints can differ in supported parameters and streaming behavior.
 
-## History and settings profiles
+## Conversation and settings profiles
 
-**History** shows prompts (with provider/model identity for new entries) and completed searches, including search scope and references. Empty-result searches are recorded; automatic indexing is not. **Back** returns to the selected view. History persists between editor sessions.
+Prompt IA shows a conversation thread for the current panel session: user prompts appear on the right in blue, followed by streamed AI responses. Sending clears the input and preserves earlier turns. There is no History button or separate history view. New searches are not recorded in history; existing stored records are retained for compatibility.
 
 **Export Settings Profile** opens a native save dialog for a JSON file. **Import Settings Profile** opens a native file picker. Cancel either dialog to leave settings and files unchanged. Profiles contain provider/model, local CPU/context budgets and source-opening preferences, exclude keys, history and machine-specific GGUF paths, and require selecting the Cloud AI Provider radio again after importing cloud settings. Files over 1 MiB or malformed JSON are rejected. There are no editable path fields or legacy-history import button.
 
@@ -104,3 +104,5 @@ llama.cpp b12284 (MIT), ONNX Runtime 1.20.1 (MIT) and a pinned all-MiniLM-L6-v2 
 Answer quality depends directly on the AI model you select, as well as the available project context. For a better experience and stronger results, choose a more capable model within your hardware or provider budget, and verify its answers. The Light model prioritizes a small download and modest hardware requirements. Leading cloud models often outperform lightweight local models; advanced local installations can run more capable models.
 
 Sending prompts and project excerpts to a cloud AI does not guarantee project confidentiality: processing, retention and access depend on the selected provider and your account terms. In Local mode this plugin does not send prompts or project excerpts to an AI provider, preserving their confidentiality with respect to cloud AI services. This is not a blanket security guarantee for the computer, other software, backups or shared files. Explicit model downloads contact the public model host without transmitting project context.
+
+Quick Start is shown only when no AI mode is selected, including after the native Settings Reset action. It is hidden for configured Local and Cloud modes. An active Quick Start continues showing progress and cancellation after it selects Local.

@@ -68,11 +68,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
         SNew(SBorder)
         .Padding(12.0f)
         [
-            SAssignNew(MainViewSwitcher, SWidgetSwitcher)
-            .WidgetIndex(0)
-
-            + SWidgetSwitcher::Slot()
-            [
                 SNew(SVerticalBox)
 
                 + SVerticalBox::Slot()
@@ -91,15 +86,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             SAssignNew(SettingsSummaryText, STextBlock)
                             .Text(this, &SGPAAssistantWidget::GetSettingsSummaryText)
                             .AutoWrapText(true)
-                        ]
-
-                        + SHorizontalBox::Slot()
-                        .AutoWidth()
-                        .Padding(0.0f, 0.0f, 8.0f, 0.0f)
-                        [
-                            SNew(SButton)
-                            .Text(LOCTEXT("HistoryButton", "History"))
-                            .OnClicked(this, &SGPAAssistantWidget::OnHistoryClicked)
                         ]
 
                         + SHorizontalBox::Slot()
@@ -163,10 +149,12 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         .FillHeight(1.0f)
                         .Padding(0.0f, 0.0f, 0.0f, 10.0f)
                         [
-                            SAssignNew(AnswerTextBox, SMultiLineEditableTextBox)
-                            .IsReadOnly(true)
-                            .AutoWrapText(true)
-                            .Text(LOCTEXT("EmptyAnswer", ""))
+                            SNew(SBorder).Padding(8)
+                            [SAssignNew(ThreadScroll, SScrollBox)
+                                + SScrollBox::Slot()
+                                [SNew(SBox).VAlign(VAlign_Bottom)
+                                    .MinDesiredHeight_Lambda([this]() { return ThreadScroll.IsValid() ? ThreadScroll->GetCachedGeometry().GetLocalSize().Y : 0.f; })
+                                    [SAssignNew(ThreadMessages, SVerticalBox)]]]
                         ]
 
                         + SVerticalBox::Slot()
@@ -270,52 +258,9 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         ]
                     ]
                 ]
-            ]
-
-            + SWidgetSwitcher::Slot()
-            [
-                SNew(SBorder)
-                .Padding(12.0f)
-                [
-                    SNew(SVerticalBox)
-
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    .Padding(0.0f, 0.0f, 0.0f, 8.0f)
-                    [
-                        SNew(SHorizontalBox)
-
-                        + SHorizontalBox::Slot()
-                        .FillWidth(1.0f)
-                        .VAlign(VAlign_Center)
-                        [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("HistoryPanelTitle", "History"))
-                        ]
-
-                        + SHorizontalBox::Slot()
-                        .AutoWidth()
-                        [
-                            SNew(SButton)
-                            .Text(LOCTEXT("CloseHistoryButton", "Back"))
-                            .OnClicked(this, &SGPAAssistantWidget::OnCloseHistoryClicked)
-                        ]
-                    ]
-
-                    + SVerticalBox::Slot()
-                    .FillHeight(1.0f)
-                    [
-                        SAssignNew(HistoryTextBox, SMultiLineEditableTextBox)
-                        .IsReadOnly(true)
-                        .AutoWrapText(true)
-                        .Text(LOCTEXT("HistoryEmpty", "No history loaded."))
-                    ]
-                ]
-            ]
         ]
     ];
 
-    AnswerTextBox->SetVAlign(VAlign_Bottom);
     LoadChatSettings();
 }
 
@@ -347,22 +292,6 @@ FReply SGPAAssistantWidget::OnSaveChatSettingsClicked()
     return FReply::Handled();
 }
 
-FReply SGPAAssistantWidget::OnHistoryClicked()
-{
-    MainViewSwitcher->SetActiveWidgetIndex(1);
-    HistoryTextBox->SetText(FText::FromString(TEXT("Loading local history...")));
-    TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
-    FGPAANativeRuntime::Get()->LoadHistory(GetProjectRoot(), [Weak](bool Ok, const FString& Message)
-    { if (auto Widget = Weak.Pin()) Widget->SetHistoryResult(Ok, Message); });
-    return FReply::Handled();
-}
-
-FReply SGPAAssistantWidget::OnCloseHistoryClicked()
-{
-    MainViewSwitcher->SetActiveWidgetIndex(0);
-    return FReply::Handled();
-}
-
 void SGPAAssistantWidget::OnViewSelectionChanged(int32 Index)
 {
     if (Index != 0 && Index != 1) return;
@@ -387,6 +316,10 @@ FReply SGPAAssistantWidget::OnSearchClicked()
     StartNative(false); return FReply::Handled();
 }
 
+EVisibility SGPAAssistantWidget::GetQuickStartButtonVisibility() const
+{
+    return GetDefault<UGPAAEditorSettings>()->ChatProvider.IsEmpty() ? EVisibility::Visible : EVisibility::Collapsed;
+}
 TSharedRef<SWidget> SGPAAssistantWidget::MakeQuickStartPanel()
 {
     auto Steps = SNew(SVerticalBox);
@@ -408,13 +341,17 @@ TSharedRef<SWidget> SGPAAssistantWidget::MakeQuickStartPanel()
                 { static FSlateColorBrush Strike(FLinearColor::White); Strike.ImageSize = FVector2D(1,1); return QuickStart->Step > I ? &Strike : nullptr; })]];
     }
     return SNew(SVerticalBox)
+        .Visibility_Lambda([this]() { return GetDefault<UGPAAEditorSettings>()->ChatProvider.IsEmpty() || QuickStart->Step >= 0 ? EVisibility::Visible : EVisibility::Collapsed; })
         + SVerticalBox::Slot().AutoHeight()
         [SNew(SHorizontalBox)
+            .Visibility_Lambda([this]() { return GetDefault<UGPAAEditorSettings>()->ChatProvider.IsEmpty() || QuickStart->Running() ? EVisibility::Visible : EVisibility::Collapsed; })
             + SHorizontalBox::Slot().AutoWidth()[SNew(SButton).Text(LOCTEXT("QuickStartButton", "Quick Start"))
+                .Visibility(this, &SGPAAssistantWidget::GetQuickStartButtonVisibility)
                 .IsEnabled_Lambda([this]() { return !QuickStart->Running() && !bBusy; })
                 .OnClicked(this, &SGPAAssistantWidget::OnQuickStartClicked)]
             + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6,0)
                 [SNew(SImage).Image(FCoreStyle::Get().GetBrush(TEXT("Icons.Help")))
+                    .Visibility(this, &SGPAAssistantWidget::GetQuickStartButtonVisibility)
                     .ToolTipText(LOCTEXT("QuickStartHelp", "Selects Local AI, downloads and verifies the Light Qwen model (about 1.04 GiB, Apache 2.0) from Qwen on Hugging Face, then runs a short local test prompt. Requires internet for the first download and additional disk space/RAM. A verified cached model is reused. Answer quality depends directly on the selected model: Light is a starting point, and a more capable model is recommended for better results if your hardware supports it. No API key or cloud prompt is used; prompts and project excerpts stay on this computer. Cloud models can offer better results than lightweight local models, but sending project content to a cloud provider does not guarantee its confidentiality. Closing this panel cancels Quick Start."))]
             + SHorizontalBox::Slot().AutoWidth().Padding(8,0)
                 [SNew(SButton).Text(LOCTEXT("CancelQuickStart", "Cancel"))
@@ -516,15 +453,6 @@ void SGPAAssistantWidget::SetResult(bool bSucceeded, const FString& Message)
     StatusText->SetToolTipText(FText::FromString(Message));
 }
 
-void SGPAAssistantWidget::SetHistoryResult(bool bSucceeded, const FString& Message)
-{
-    if (!bCancellable) StatusText->SetText(FText::FromString(bSucceeded ? TEXT("History loaded") : TEXT("Error")));
-    if (HistoryTextBox.IsValid())
-    {
-        HistoryTextBox->SetText(FText::FromString(Message));
-    }
-}
-
 void SGPAAssistantWidget::SetSearchResult(bool bSucceeded, const FString& Message, const TArray<FGPAASourceReference>& Results)
 {
     StopBusy();
@@ -546,8 +474,13 @@ void SGPAAssistantWidget::SetSearchResult(bool bSucceeded, const FString& Messag
 
 void SGPAAssistantWidget::SetAnswerText(const FString& Text)
 {
+    if (!AnswerTextBox.IsValid())
+    {
+        ThreadMessages->AddSlot().AutoHeight().Padding(0,0,0,14)
+            [SAssignNew(AnswerTextBox, SMultiLineEditableTextBox).IsReadOnly(true).AutoWrapText(true)];
+    }
     AnswerTextBox->SetText(FText::FromString(Text));
-    AnswerTextBox->ScrollTo(ETextLocation::EndOfDocument);
+    ThreadScroll->ScrollToEnd();
 }
 
 void SGPAAssistantWidget::BeginPromptTurn(const FString& Prompt)
@@ -556,16 +489,25 @@ void SGPAAssistantWidget::BeginPromptTurn(const FString& Prompt)
     NativeAnswer.Reset();
     bPromptTurnActive = true;
     PromptQuestionTextBox->SetText(FText::GetEmpty());
+    ThreadMessages->AddSlot().AutoHeight().HAlign(HAlign_Right).Padding(0,0,0,10)
+        [SNew(SBox).MaxDesiredWidth_Lambda([this]()
+            { const float Width = ThreadScroll->GetCachedGeometry().GetLocalSize().X; return Width > 0 ? Width * .8f : 600.f; })
+            [SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")))
+                .BorderBackgroundColor(FLinearColor(.06f,.18f,.28f)).Padding(12)
+                [SNew(STextBlock).Text(FText::FromString(Prompt)).AutoWrapText(true)
+                    .Justification(ETextJustify::Right).ColorAndOpacity(FLinearColor(.65f,.85f,1.f))]]];
+    AnswerTextBox.Reset();
     RenderPromptTurn();
 }
 void SGPAAssistantWidget::RenderPromptTurn()
 {
-    SetAnswerText(ConversationText + (bPromptTurnActive
-        ? TEXT("You:\n") + ActivePrompt + TEXT("\n\nAI:\n") + NativeAnswer : FString()));
+    if (bPromptTurnActive) SetAnswerText(NativeAnswer);
+    else ThreadScroll->ScrollToEnd();
 }
 void SGPAAssistantWidget::FinishPromptTurn(const FString& Answer)
 {
     ConversationText += TEXT("You:\n") + ActivePrompt + TEXT("\n\nAI:\n") + Answer + TEXT("\n\n");
+    SetAnswerText(Answer);
     bPromptTurnActive = false;
     ActivePrompt.Reset();
     RenderPromptTurn();

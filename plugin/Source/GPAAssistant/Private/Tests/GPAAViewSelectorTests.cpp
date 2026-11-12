@@ -20,9 +20,6 @@ bool FGPAAViewSelectorTest::RunTest(const FString& Parameters)
     Panel->OnViewSelectionChanged(1);
     TestEqual(TEXT("Search selection displays search"), Panel->TabSwitcher->GetActiveWidgetIndex(), 1);
     TestEqual(TEXT("Selection state agrees with content"), Panel->ActiveTabIndex, 1);
-    Panel->OnHistoryClicked();
-    Panel->OnCloseHistoryClicked();
-    TestEqual(TEXT("History Back preserves selected view"), Panel->TabSwitcher->GetActiveWidgetIndex(), 1);
     Panel->OnViewSelectionChanged(0);
     TestEqual(TEXT("Prompt selection restores prompt"), Panel->TabSwitcher->GetActiveWidgetIndex(), 0);
     TestEqual(TEXT("Prompt text retained"), Panel->GetPromptQuestion(), FString(TEXT("Keep this prompt")));

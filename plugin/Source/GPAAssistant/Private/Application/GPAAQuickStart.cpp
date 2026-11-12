@@ -15,13 +15,17 @@ bool FGPAAQuickStart::Start()
     Message = TEXT("Configuring local AI...");
     return true;
 }
-void FGPAAQuickStart::Fail(const FString& Error) { bRunning = false; Message = Error + TEXT(" You can retry Quick Start."); }
+void FGPAAQuickStart::Fail(const FString& Error) { Cancel(); Message = Error + TEXT(" You can retry Quick Start."); }
 void FGPAAQuickStart::Cancel()
 {
     if (!bRunning) return;
     bRunning = false;
     if (bOwnDownload) FGPAALocalModels::Get().Cancel();
     if (Chat) Chat->Cancel();
+    auto* Settings = GetMutableDefault<UGPAAEditorSettings>();
+    if (Step > 0 && Settings->ChatProvider == TEXT("Local") &&
+        Settings->LocalModelId == TEXT("qwen2.5-coder-1.5b-q4km") && Settings->LocalModelFile.IsEmpty())
+    { Settings->ChatProvider.Reset(); Settings->SaveConfig(); }
     Message = TEXT("Quick Start cancelled. Any partial download can be resumed by retrying.");
 }
 void FGPAAQuickStart::Tick()
@@ -37,6 +41,7 @@ void FGPAAQuickStart::Tick()
         Settings->LocalModelId = TEXT("qwen2.5-coder-1.5b-q4km");
         Settings->LocalModelFile.Reset(); Settings->LocalContextTokens = 4096; Settings->LocalThreads = 4;
         Settings->SelectAI(true);
+        Step = 1;
         if (!Models.Download(Settings->LocalModelId)) { Fail(TEXT("Could not start the model download.")); return; }
         bOwnDownload = true; Step = 1;
     }
