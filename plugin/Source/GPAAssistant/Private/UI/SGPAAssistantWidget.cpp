@@ -180,6 +180,10 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             [
                                 SAssignNew(PromptQuestionTextBox, SEditableTextBox)
                                 .HintText(LOCTEXT("QuestionPlaceholder", "Prompt your AI here"))
+                                .OnTextCommitted_Lambda([this](const FText&, ETextCommit::Type CommitType)
+                                {
+                                    if (CommitType == ETextCommit::OnEnter) OnAskClicked();
+                                })
                             ]
 
                             + SHorizontalBox::Slot()
