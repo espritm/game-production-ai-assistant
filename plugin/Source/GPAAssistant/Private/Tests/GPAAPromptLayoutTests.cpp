@@ -32,6 +32,27 @@ bool FGPAAPromptLayoutTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Prompt starts empty, not with a submitted example"), Panel->GetPromptQuestion().IsEmpty());
     TestEqual(TEXT("Prompt hint matches requested copy"), Panel->PromptQuestionTextBox->GetHintText().ToString(), FString(TEXT("Prompt your AI here")));
     TestFalse(TEXT("Redundant prompt and answer labels removed"), HasOldPromptLabel(Panel));
+    auto CheckComposer = [&](const FString& Text)
+    {
+        Panel->PromptQuestionTextBox->SetText(FText::FromString(Text));
+        Panel->PromptInputRow->SlatePrepass();
+        const float Height = Panel->PromptInputRow->GetDesiredSize().Y;
+        FArrangedChildren Composer(EVisibility::Visible);
+        Panel->PromptInputRow->ArrangeChildren(FGeometry::MakeRoot(FVector2D(800, Height), FSlateLayoutTransform()), Composer);
+        TestEqual(TEXT("Idle composer has an input and Send"), Composer.Num(), 2);
+        if (Composer.Num() == 2)
+        {
+            TestTrue(TEXT("Prompt reserves at least 64 Slate units even when empty"), Composer[0].Geometry.GetLocalSize().Y >= 64);
+            TestTrue(TEXT("Send keeps its natural compact height"), Composer[1].Geometry.GetLocalSize().Y < 40);
+            const float InputBottom = Composer[0].Geometry.GetAbsolutePosition().Y + Composer[0].Geometry.GetLocalSize().Y;
+            const float SendBottom = Composer[1].Geometry.GetAbsolutePosition().Y + Composer[1].Geometry.GetLocalSize().Y;
+            TestTrue(TEXT("Send bottom matches prompt bottom"), FMath::IsNearlyEqual(InputBottom, SendBottom, .1f));
+        }
+    };
+    CheckComposer(TEXT(""));
+    CheckComposer(TEXT("One\nTwo\nThree"));
+    CheckComposer(TEXT("One\nTwo\nThree\nFour\nFive\nSix\nSeven"));
+    Panel->PromptQuestionTextBox->SetText(FText::GetEmpty());
     Panel->SetAnswerText(TEXT("A short answer."));
     const auto FirstAnswer = Panel->AnswerTextBox;
     FString LongAnswer;

@@ -160,7 +160,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         + SVerticalBox::Slot()
                         .AutoHeight()
                         [
-                            SNew(SHorizontalBox)
+                            SAssignNew(PromptInputRow, SHorizontalBox)
 
                             + SHorizontalBox::Slot()
                             .FillWidth(1.0f)
@@ -182,7 +182,7 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                             .AutoWidth()
                             .VAlign(VAlign_Bottom)
                             [
-                                SNew(SButton)
+                                SAssignNew(SendButton, SButton)
                                 .Text(LOCTEXT("SendButton", "Send"))
                                 .OnClicked(this, &SGPAAssistantWidget::OnAskClicked)
                             ]

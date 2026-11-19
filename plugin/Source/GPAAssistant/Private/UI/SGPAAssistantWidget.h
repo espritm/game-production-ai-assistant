@@ -18,6 +18,7 @@ class STextBlock;
 class SWidgetSwitcher;
 class SScrollBox;
 class SVerticalBox;
+class SHorizontalBox;
 class FGPAAQuickStart;
 enum class ECheckBoxState : uint8;
 class ITableRow;
@@ -112,6 +113,8 @@ private:
     TSharedPtr<SEditableTextBox> SourceOpenerTextBox;
     TSharedPtr<SComboBox<TSharedPtr<FString>>> ChatProviderComboBox;
     TSharedPtr<SMultiLineEditableTextBox> PromptQuestionTextBox;
+    TSharedPtr<SHorizontalBox> PromptInputRow;
+    TSharedPtr<SButton> SendButton;
     TSharedPtr<SEditableTextBox> SearchQueryTextBox;
     TSharedPtr<SWidgetSwitcher> TabSwitcher;
     TSharedPtr<STextBlock> StatusText;
