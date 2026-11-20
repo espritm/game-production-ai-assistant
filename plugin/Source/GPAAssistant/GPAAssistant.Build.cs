@@ -7,7 +7,7 @@ public class GPAAssistant : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicSystemLibraries.Add("Advapi32.lib");
-        if (Target.bBuildDeveloperTools) PrivateDependencyModuleNames.AddRange(new[] { "HTTPServer", "Sockets" });
+        if (Target.bBuildDeveloperTools) PrivateDependencyModuleNames.AddRange(new[] { "HTTPServer", "Sockets", "UMG", "RenderCore", "RHI" });
 
         PublicDependencyModuleNames.AddRange(new[]
         {

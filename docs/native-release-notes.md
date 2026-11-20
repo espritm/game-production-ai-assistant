@@ -1,5 +1,11 @@
 # Game Production AI Assistant 0.3.0 — Local AI beta
 
+- First-run Local/Cloud selection and guided local Quick Start with explicit progress, download verification and a test prompt.
+- Session conversation with distinct right-aligned user messages, streaming answers, Enter to send and Shift+Enter for new lines.
+- Prompt input reserves three lines; Send/Cancel keep compact bottom alignment. Separate History UI and new search-history writes are removed.
+- Settings reset clears AI selection; help explains model quality, local privacy boundaries and provider-specific cloud charges.
+- Maintenance: conversation and Quick Start views separated from orchestration; obsolete companion-settings UI removed; shared defaults and typed setup steps.
+- Releases: reviewed main tags request isolated private builds, exact-archive tests, checksums and a current Fab dossier.
 - Native CPU local chat provider, with no companion application or API key requirement.
 - Curated instruction GGUF catalogue with explicit downloads, resume/cancel, pinned SHA256 verification, managed removal and existing-file selection.
 - Source-grounded local streaming, token/context budgets, cooperative cancellation and shutdown cleanup.

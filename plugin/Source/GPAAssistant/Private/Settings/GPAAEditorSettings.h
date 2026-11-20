@@ -14,9 +14,10 @@ class UGPAAEditorSettings final : public UDeveloperSettings
   public:
     UGPAAEditorSettings();
     virtual void PostInitProperties() override;
-    virtual void PostEditChangeProperty(FPropertyChangedEvent& Event) override;
+    virtual void PostEditChangeProperty(FPropertyChangedEvent &Event) override;
     void SelectAI(bool Local);
     void ResetToDefaults();
+    void ConfigureLocalDefaults();
     UPROPERTY(EditAnywhere, Config, Category = "Project") FString ProjectRootOverride;
     UPROPERTY(Config)
     FString ChatProvider;
@@ -39,11 +40,14 @@ class UGPAAEditorSettings final : public UDeveloperSettings
     int32 MaxOutputTokens = 512;
     UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (GetOptions = "GetLocalModelOptions"))
     FString LocalModelId;
-    UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (ToolTip = "Optional existing instruction GGUF. Empty uses the selected downloaded model. This machine-specific path is excluded from profiles."))
+    UPROPERTY(EditAnywhere, Config, Category = "Local AI",
+              meta = (ToolTip = "Optional existing instruction GGUF. Empty uses the selected downloaded model. This machine-specific path is excluded from profiles."))
     FString LocalModelFile;
     UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (ClampMin = "2048", ClampMax = "8192"))
     int32 LocalContextTokens = 4096;
-    UPROPERTY(EditAnywhere, Config, Category = "Local AI", meta = (ClampMin = "1", ClampMax = "8", ToolTip = "CPU threads reserved for local inference. Unreal also needs CPU and RAM."))
+    UPROPERTY(EditAnywhere, Config, Category = "Local AI",
+              meta = (ClampMin = "1", ClampMax = "8",
+                      ToolTip = "CPU threads reserved for local inference. Unreal also needs CPU and RAM."))
     int32 LocalThreads = 4;
     UFUNCTION() TArray<FString> GetChatProviderOptions() const;
     UFUNCTION() TArray<FString> GetLocalModelOptions() const;
@@ -57,16 +61,20 @@ class UGPAAEditorSettings final : public UDeveloperSettings
     UPROPERTY(EditAnywhere, Config, Category = "Source Opener") FString CustomSourceOpenerCommand;
     FString LastKeyResult;
     FString LastProfileResult;
-    UFUNCTION(CallInEditor, Category = "Cloud AI Provider", meta = (DisplayName = "Save Personal Key")) void SavePersonalKey();
-    UFUNCTION(CallInEditor, Category = "Cloud AI Provider", meta = (DisplayName = "Remove Personal Key")) void RemovePersonalKey();
+    UFUNCTION(CallInEditor, Category = "Cloud AI Provider", meta = (DisplayName = "Save Personal Key"))
+    void SavePersonalKey();
+    UFUNCTION(CallInEditor, Category = "Cloud AI Provider", meta = (DisplayName = "Remove Personal Key"))
+    void RemovePersonalKey();
     UFUNCTION(CallInEditor, Category = "Import / Export") void ExportSettingsProfile();
     UFUNCTION(CallInEditor, Category = "Import / Export") void ImportSettingsProfile();
-    bool ExportSettingsProfileToFile(const FString& Path);
-    bool ImportSettingsProfileFromFile(const FString& Path);
+    bool ExportSettingsProfileToFile(const FString &Path);
+    bool ImportSettingsProfileFromFile(const FString &Path);
     FString GetResolvedProjectRoot() const;
     FGPAAChatSettings ToChatSettings() const;
     void ApplyChatSettings(const FGPAAChatSettings &Settings);
+
   private:
-    bool ChooseProfileFile(bool Save, FString& Path);
+    void SetDefaultValues();
+    bool ChooseProfileFile(bool Save, FString &Path);
     FString LastProfileDirectory;
 };

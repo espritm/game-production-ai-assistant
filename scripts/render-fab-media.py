@@ -37,34 +37,34 @@ def base(kicker):
 
 im, d = base("Find the context. Keep creating.")
 d.text((90, 233), "Game Production\nAI Assistant", font=font(92, True), fill=WHITE, spacing=3)
-d.text((96, 500), "Local project search.\nCloud answers with project references.", font=font(40), fill=MUTED, spacing=16)
+d.text((96, 500), "Local project search.\nLocal or cloud answers with references.", font=font(40), fill=MUTED, spacing=16)
 im.paste(icon(420), (1370, 245))
-for x, title, subtitle in [(96, "SEARCH LOCALLY", "Code + asset metadata"), (690, "ASK YOUR PROVIDER", "Personal API key"), (1280, "INSTALL & ENABLE", "Model included")]:
+for x, title, subtitle in [(96, "SEARCH LOCALLY", "Code + asset metadata"), (690, "CHOOSE YOUR AI", "Local or cloud"), (1280, "QUICK START", "Verified model download")]:
     d.rounded_rectangle((x, 730, x+535, 895), radius=18, fill=PANEL)
     d.text((x+28, 760), title, font=font(26, True), fill=MINT)
     d.text((x+28, 814), subtitle, font=font(27), fill=WHITE)
 d.text((96, 635), "FREE PLUGIN  /  Cloud API usage billed separately", font=font(25, True), fill=MINT)
 im.save(OUT / "01-cover.png", optimize=True)
 
-capture = OUT / "captures/prompt.png"
+capture = OUT / "captures/prompt-v0.3.png"
 if capture.exists():
     im, d = base("Inside your Unreal Editor")
     d.text((90, 250), "Ask with\nproject context.", font=font(73, True), fill=WHITE, spacing=10)
-    d.text((94, 490), "Streamed answers\nSource references\nLocal prompt + search history", font=font(34), fill=MUTED, spacing=28)
-    d.text((94, 770), "Actual Unreal Editor capture\nAsset references in a conversation.", font=font(23), fill=MUTED, spacing=10)
-    shot = Image.open(capture).convert("RGB").crop((650, 100, 1427, 998))
-    shot.thumbnail((790, 835), Image.Resampling.LANCZOS)
-    im.paste(shot, (1040, 122))
+    d.text((94, 490), "Streamed answers\nDistinct user messages\nLocal model or your provider", font=font(34), fill=MUTED, spacing=28)
+    d.text((94, 770), "Compiled Slate interface preview\nExample conversation, not a model evaluation.", font=font(23), fill=MUTED, spacing=10)
+    shot = Image.open(capture).convert("RGB")
+    shot.thumbnail((1000, 800), Image.Resampling.LANCZOS)
+    im.paste(shot, (830, 180))
     im.save(OUT / "02-in-editor.png", optimize=True)
 
 im, d = base("Choose what stays local")
-d.text((90, 230), "Local search. Optional cloud chat.", font=font(72, True), fill=WHITE)
-for x, title, lines in [(90, "ON YOUR PC", ["Incremental project index", "Bundled CPU embedding model", "Code + asset metadata search", "SQLite index and history"]), (1000, "YOUR CLOUD PROVIDER", ["Your question + selected excerpts", "Explicit context-sharing consent", "Personal key in Windows Credential Manager", "Separate provider account and API charges"])]:
+d.text((90, 230), "Local search. Local or cloud answers.", font=font(72, True), fill=WHITE)
+for x, title, lines in [(90, "ON YOUR PC", ["Local search + CPU generation", "Models downloaded on request", "No prompts sent to an AI provider", "Quick Start with integrity checks"]), (1000, "YOUR CLOUD PROVIDER", ["Your question + selected excerpts", "Explicit context-sharing consent", "Personal key in Windows Credential Manager", "Separate provider account and API charges"])]:
     d.rounded_rectangle((x, 390, x+830, 850), radius=24, fill=PANEL)
     d.text((x+36, 428), title, font=font(32, True), fill=MINT)
     for i, text in enumerate(lines):
         d.text((x+36, 515+i*70), text, font=font(28), fill=WHITE)
-d.text((96, 895), "No companion application. No separate model installation. Local search works offline.", font=font(28), fill=MUTED)
+d.text((96, 895), "Quality depends on model capability. Cloud provider terms and charges apply.", font=font(28), fill=MUTED)
 im.save(OUT / "03-local-and-cloud.png", optimize=True)
 
 images = []
@@ -74,5 +74,5 @@ for p in sorted(OUT.glob("0*.png")):
     assert p.stat().st_size < 3_000_000
     images.append({"file": p.name, "width": 1920, "height": 1080, "bytes": p.stat().st_size})
 assert sum(p["bytes"] for p in images) < 25_000_000
-(OUT / "media-manifest.json").write_text(json.dumps({"images": images, "source": "Original GPAA branding; real Unreal capture for 02-in-editor only", "captureCrop": [650, 100, 1427, 998], "generativeAIImages": False}, indent=2), encoding="utf-8")
+(OUT / "media-manifest.json").write_text(json.dumps({"images": images, "source": "Original GPAA layouts; compiled Slate v0.3 interface preview with an explicitly seeded example conversation", "captureCrop": None, "generativeAIImages": False}, indent=2), encoding="utf-8")
 print(json.dumps(images))

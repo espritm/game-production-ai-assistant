@@ -16,3 +16,11 @@ plugin/Source/ThirdParty/MiniLM/
 
 plugin/Source/ThirdParty/Llama/
 plugin/Source/ThirdParty/LocalModels/
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

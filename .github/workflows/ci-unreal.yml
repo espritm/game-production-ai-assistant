@@ -1,173 +1,21 @@
-name: Unreal Plugin CI
-
+name: Native source policy
 on:
   pull_request:
   push:
-    branches:
-      - main
-      - dev
+    branches: [main, dev]
   workflow_dispatch:
-    inputs:
-      unrealVersion:
-        description: Unreal installation and matching runner label
-        type: choice
-        options: ['5.6', '5.8']
-        default: '5.6'
-      localAIAcceptance:
-        description: Download and validate the light local chat model (about 1.04 GiB, cached on runner)
-        type: boolean
-        default: false
-
 permissions:
   contents: read
-
-concurrency:
-  group: unreal-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-plugin-ue-5-6:
-    name: Build native plugin (Win64)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on:
-      - self-hosted
-      - windows
-      - x64
-      - unreal
-      - ue-${{ inputs.unrealVersion || '5.6' }}
-    timeout-minutes: 90
-    env:
-      GPAA_ENGINE_VERSION: ${{ inputs.unrealVersion || '5.6' }}
-    defaults:
-      run:
-        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
-
+  source-policy:
+    runs-on: windows-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Map a short Unreal build path
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $drive = @('Z:', 'Y:', 'X:', 'W:', 'V:', 'U:', 'T:') | Where-Object { -not (Test-Path "$_\") } | Select-Object -First 1
-          if (-not $drive) { throw 'No free drive letter is available for the Unreal build.' }
-          subst.exe $drive $env:GITHUB_WORKSPACE
-          if ($LASTEXITCODE -ne 0) { throw 'Could not map the short Unreal build path.' }
-          "GPAA_BUILD_DRIVE=$drive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "GPAA_BUILD_ROOT=$drive\" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Resolve Unreal Engine installation
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $variable = 'UE_' + $env:GPAA_ENGINE_VERSION.Replace('.', '_') + '_ROOT'
-          $engineRoot = [Environment]::GetEnvironmentVariable($variable)
-          if ([string]::IsNullOrWhiteSpace($engineRoot)) {
-              $engineRoot = "C:\Program Files\Epic Games\UE_$env:GPAA_ENGINE_VERSION"
-          }
-
-          $runUat = Join-Path $engineRoot "Engine\Build\BatchFiles\RunUAT.bat"
-          if (-not (Test-Path -LiteralPath $runUat -PathType Leaf)) {
-              throw "Unreal Automation Tool was not found at '$runUat'. Configure $variable on the runner."
-          }
-
-          "GPAA_ENGINE_ROOT=$engineRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Build and verify complete distribution package
-        working-directory: ${{ env.GPAA_BUILD_ROOT }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $env:GPAA_NATIVE_DEPENDENCY_CACHE = Join-Path $env:RUNNER_TOOL_CACHE 'gpaa-native-dependencies'
-          & .\scripts\package-native-plugin.ps1 -UnrealEngineRoot $env:GPAA_ENGINE_ROOT
-
-      - name: Install exact release archive and run Unreal smoke test
-        working-directory: ${{ env.GPAA_BUILD_ROOT }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = (Get-Content plugin/GameProductionAIAssistant.uplugin -Raw | ConvertFrom-Json).VersionName
-          & .\scripts\test-native-plugin.ps1 `
-            -UnrealEngineRoot $env:GPAA_ENGINE_ROOT `
-            -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip" `
-            -TestFilter GPAA
-
-      - name: Verify pending HTTP shutdown and late-request rejection
-        working-directory: ${{ env.GPAA_BUILD_ROOT }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = (Get-Content plugin/GameProductionAIAssistant.uplugin -Raw | ConvertFrom-Json).VersionName
-          & .\scripts\test-native-plugin.ps1 `
-            -UnrealEngineRoot $env:GPAA_ENGINE_ROOT `
-            -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip" `
-            -HttpShutdownAcceptance
-
-      - name: Optional real local chat acceptance
-        if: github.event_name == 'workflow_dispatch' && inputs.localAIAcceptance
-        working-directory: ${{ env.GPAA_BUILD_ROOT }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = (Get-Content plugin/GameProductionAIAssistant.uplugin -Raw | ConvertFrom-Json).VersionName
-          & .\scripts\test-native-plugin.ps1 `
-            -UnrealEngineRoot $env:GPAA_ENGINE_ROOT `
-            -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip" `
-            -LocalAIAcceptance `
-            -LocalModelCache (Join-Path $env:RUNNER_TOOL_CACHE 'gpaa-local-models')
-
-      - name: Verify automatic startup and minute refresh without a panel
-        working-directory: ${{ env.GPAA_BUILD_ROOT }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = (Get-Content plugin/GameProductionAIAssistant.uplugin -Raw | ConvertFrom-Json).VersionName
-          & .\scripts\test-automatic-index.ps1 `
-            -UnrealEngineRoot $env:GPAA_ENGINE_ROOT `
-            -PackagePath ".gpaa\releases\GameProductionAIAssistant-native-v$version-UE$env:GPAA_ENGINE_VERSION-Win64.zip"
-
-      - name: Test native distribution policy
-        working-directory: ${{ env.GPAA_BUILD_ROOT }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          & .\scripts\tests\verify-native-package.Tests.ps1
-
-      - name: Upload compiled plugin
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          name: gpaa-native-ue-${{ env.GPAA_ENGINE_VERSION }}-win64-${{ github.sha }}
-          path: ${{ github.workspace }}/.gpaa/releases/*native*.zip
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Upload smoke test evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gpaa-native-smoke-ue-${{ env.GPAA_ENGINE_VERSION }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ github.workspace }}/.gpaa/native-smoke
-            ${{ github.workspace }}/.gpaa/automatic-index-smoke
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Collect Unreal Automation Tool logs
-        if: always()
+          persist-credentials: false
+      - name: Check source publication policy and release guards
+        shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $source = Join-Path $env:APPDATA "Unreal Engine\AutomationTool\Logs"
-          $destination = Join-Path $env:GITHUB_WORKSPACE ".gpaa\ci\uat-logs"
-          if (Test-Path -LiteralPath $source) {
-              New-Item -ItemType Directory -Force -Path $destination | Out-Null
-              Copy-Item -Path "$source\*" -Destination $destination -Recurse -Force
-          }
-
-      - name: Upload Unreal Automation Tool logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gpaa-uat-logs-ue-5.6-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ github.workspace }}/.gpaa/ci/uat-logs
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Remove short build path mapping
-        if: always() && env.GPAA_BUILD_DRIVE != ''
-        run: |
-          $ErrorActionPreference = 'Stop'
-          subst.exe $env:GPAA_BUILD_DRIVE /D
-          if ($LASTEXITCODE -ne 0) { throw 'Could not remove the short build path mapping.' }
+          ./scripts/tests/public-source-policy.Tests.ps1
+          ./scripts/tests/release-ref.Tests.ps1
+          ./scripts/tests/publish-release.Tests.ps1

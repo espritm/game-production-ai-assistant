@@ -2,6 +2,7 @@
 #include "Misc/AutomationTest.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "UI/SGPAAssistantWidget.h"
+#include "UI/SGPAAConversationView.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Text/STextBlock.h"
@@ -54,34 +55,34 @@ bool FGPAAPromptLayoutTest::RunTest(const FString& Parameters)
     CheckComposer(TEXT("One\nTwo\nThree\nFour\nFive\nSix\nSeven"));
     Panel->PromptQuestionTextBox->SetText(FText::GetEmpty());
     Panel->SetAnswerText(TEXT("A short answer."));
-    const auto FirstAnswer = Panel->AnswerTextBox;
+    const auto FirstAnswer = Panel->Conversation->AnswerTextBox;
     FString LongAnswer;
     for (int32 I = 0; I < 300; ++I) LongAnswer += TEXT("A longer streamed answer remains selectable.\n");
     Panel->SetAnswerText(LongAnswer);
-    TestEqual(TEXT("Long answers are retained"), Panel->AnswerTextBox->GetText().ToString(), LongAnswer);
+    TestEqual(TEXT("Long answers are retained"), Panel->Conversation->AnswerTextBox->GetText().ToString(), LongAnswer);
     Panel->PromptQuestionTextBox->SetText(FText::FromString(TEXT("First question")));
     Panel->BeginPromptTurn(Panel->GetPromptQuestion());
     TestTrue(TEXT("Sending clears the input"), Panel->GetPromptQuestion().IsEmpty());
     Panel->NativeAnswer = TEXT("First streamed answer"); Panel->RenderPromptTurn();
-    TestEqual(TEXT("User and AI have separate message rows"), Panel->ThreadMessages->NumSlots(), 3);
-    Panel->ThreadMessages->SlatePrepass();
+    TestEqual(TEXT("User and AI have separate message rows"), Panel->Conversation->Messages->NumSlots(), 3);
+    Panel->Conversation->Messages->SlatePrepass();
     FArrangedChildren Rows(EVisibility::Visible);
-    Panel->ThreadMessages->ArrangeChildren(FGeometry::MakeRoot(FVector2D(800,1200), FSlateLayoutTransform()), Rows);
+    Panel->Conversation->Messages->ArrangeChildren(FGeometry::MakeRoot(FVector2D(800,1200), FSlateLayoutTransform()), Rows);
     TestEqual(TEXT("All message rows are arranged"), Rows.Num(), 3);
     if (Rows.Num() == 3) TestTrue(TEXT("User prompt is aligned to the right"), Rows[1].Geometry.GetAbsolutePosition().X > 0);
-    const auto FirstTurnAnswer = Panel->AnswerTextBox;
+    const auto FirstTurnAnswer = Panel->Conversation->AnswerTextBox;
     Panel->SetChatResult(true, TEXT("Complete"), TEXT("First complete answer"), {});
     Panel->BeginPromptTurn(TEXT("Second question"));
     Panel->NativeAnswer = TEXT("Second partial answer"); Panel->RenderPromptTurn();
     TestEqual(TEXT("Previous answer widget retains the completed response"), FirstTurnAnswer->GetText().ToString(), FString(TEXT("First complete answer")));
-    TestTrue(TEXT("New response uses its own widget"), Panel->AnswerTextBox != FirstTurnAnswer);
-    TestEqual(TEXT("Both prompt/answer pairs remain in the thread"), Panel->ThreadMessages->NumSlots(), 5);
-    TestEqual(TEXT("Only the active response streams"), Panel->AnswerTextBox->GetText().ToString(), FString(TEXT("Second partial answer")));
+    TestTrue(TEXT("New response uses its own widget"), Panel->Conversation->AnswerTextBox != FirstTurnAnswer);
+    TestEqual(TEXT("Both prompt/answer pairs remain in the thread"), Panel->Conversation->Messages->NumSlots(), 5);
+    TestEqual(TEXT("Only the active response streams"), Panel->Conversation->AnswerTextBox->GetText().ToString(), FString(TEXT("Second partial answer")));
     Panel->SetChatResult(false, TEXT("Test interruption"), TEXT("Second partial answer"), {});
-    TestTrue(TEXT("Interrupted response remains in the thread"), Panel->AnswerTextBox->GetText().ToString().Contains(TEXT("Second partial answer\n\n[Interrupted] Test interruption")));
-    const FString Thread = Panel->AnswerTextBox->GetText().ToString();
+    TestTrue(TEXT("Interrupted response remains in the thread"), Panel->Conversation->AnswerTextBox->GetText().ToString().Contains(TEXT("Second partial answer\n\n[Interrupted] Test interruption")));
+    const FString Thread = Panel->Conversation->AnswerTextBox->GetText().ToString();
     Panel->SetResult(true, TEXT("Settings loaded"));
-    TestEqual(TEXT("Status updates do not replace conversation"), Panel->AnswerTextBox->GetText().ToString(), Thread);
+    TestEqual(TEXT("Status updates do not replace conversation"), Panel->Conversation->AnswerTextBox->GetText().ToString(), Thread);
     Panel->bBusy = true;
     Panel->PromptQuestionTextBox->SetText(FText::FromString(TEXT("Unsent draft")));
     Panel->StartNative(true);

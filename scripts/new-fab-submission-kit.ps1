@@ -1,8 +1,9 @@
 [CmdletBinding()]
-param([string] $Version='0.2.0', [string[]] $EngineVersions=@('5.6','5.8'))
+param([string] $Version='', [string[]] $EngineVersions=@('5.6','5.8'), [switch] $PassThru)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $root=Split-Path -Parent $PSScriptRoot
+if (!$Version) { $Version=(Get-Content (Join-Path $root 'plugin/GameProductionAIAssistant.uplugin') -Raw | ConvertFrom-Json).VersionName }
 $destination=Join-Path $root ('.gpaa\fab-submission\'+$Version+'-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $destination | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -67,3 +68,4 @@ $zipPath=$destination+'.zip'
 Write-Host "Fab dossier: $destination"
 Write-Host "Dossier ZIP: $zipPath"
 Write-Host "SHA256: $((Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash)"
+if ($PassThru) { Write-Output $zipPath }

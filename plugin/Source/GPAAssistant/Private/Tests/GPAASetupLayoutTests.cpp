@@ -2,6 +2,7 @@
 #include "Misc/AutomationTest.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "UI/SGPAAssistantWidget.h"
+#include "UI/SGPAAQuickStartView.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
@@ -31,9 +32,9 @@ bool HasObsoleteKnowledgeControl(const TSharedRef<SWidget>& Widget)
     return false;
 }
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGPAAHistoryLayoutTest, "GPAA.Native.UI.SetupVisibilityAndNoHistory",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGPAASetupLayoutTest, "GPAA.Native.UI.SetupVisibilityAndNoHistory",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-bool FGPAAHistoryLayoutTest::RunTest(const FString& Parameters)
+bool FGPAASetupLayoutTest::RunTest(const FString& Parameters)
 {
     auto Panel = SNew(SGPAAssistantWidget);
     Panel->PromptQuestionTextBox->SetText(FText::FromString(TEXT("Keep my question")));
@@ -43,9 +44,9 @@ bool FGPAAHistoryLayoutTest::RunTest(const FString& Parameters)
     TArray<uint8> Snapshot;
     FObjectWriter Backup(Settings, Snapshot);
     Settings->SelectAI(true);
-    TestTrue(TEXT("Quick Start is hidden with Local configured"), Panel->GetQuickStartButtonVisibility() == EVisibility::Collapsed);
+    TestTrue(TEXT("Quick Start is hidden with Local configured"), Panel->QuickStartView->GetQuickStartButtonVisibility() == EVisibility::Collapsed);
     Settings->SelectAI(false);
-    TestTrue(TEXT("Quick Start is hidden with Cloud configured"), Panel->GetQuickStartButtonVisibility() == EVisibility::Collapsed);
+    TestTrue(TEXT("Quick Start is hidden with Cloud configured"), Panel->QuickStartView->GetQuickStartButtonVisibility() == EVisibility::Collapsed);
     TestFalse(TEXT("Configured local mode requires no setup"), Settings->ChatProvider.IsEmpty());
     auto Container = FModuleManager::LoadModuleChecked<ISettingsModule>(TEXT("Settings")).GetContainer(TEXT("Project"));
     auto Category = Container ? Container->GetCategory(TEXT("Plugins")) : nullptr;
@@ -55,7 +56,7 @@ bool FGPAAHistoryLayoutTest::RunTest(const FString& Parameters)
     {
         TestTrue(TEXT("Native reset succeeds"), Section->ResetDefaults());
         TestTrue(TEXT("Reset clears both AI radio choices"), Settings->ChatProvider.IsEmpty());
-        TestTrue(TEXT("Quick Start returns after native reset"), Panel->GetQuickStartButtonVisibility() == EVisibility::Visible);
+        TestTrue(TEXT("Quick Start returns after native reset"), Panel->QuickStartView->GetQuickStartButtonVisibility() == EVisibility::Visible);
     }
     FObjectReader Restore(Settings, Snapshot);
     Settings->SaveConfig();

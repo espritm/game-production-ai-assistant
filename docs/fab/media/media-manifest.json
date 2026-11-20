@@ -4,27 +4,22 @@
       "file": "01-cover.png",
       "width": 1920,
       "height": 1080,
-      "bytes": 96833
+      "bytes": 93101
     },
     {
       "file": "02-in-editor.png",
       "width": 1920,
       "height": 1080,
-      "bytes": 208741
+      "bytes": 111022
     },
     {
       "file": "03-local-and-cloud.png",
       "width": 1920,
       "height": 1080,
-      "bytes": 78117
+      "bytes": 80521
     }
   ],
-  "source": "Original GPAA branding; real Unreal capture for 02-in-editor only",
-  "captureCrop": [
-    650,
-    100,
-    1427,
-    998
-  ],
+  "source": "Original GPAA layouts; compiled Slate v0.3 interface preview with an explicitly seeded example conversation",
+  "captureCrop": null,
   "generativeAIImages": false
 }
