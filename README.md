@@ -1,288 +1,79 @@
 # Game Production AI Assistant
 
-An open-source, local-first AI assistant for AAA game production pipelines.
+A Windows Unreal Editor plugin for local project search and source-aware AI answers, developed by **Maxime ESPRIT**.
 
-## Vision
+Search code and asset metadata inside the editor. Generate answers with a downloaded local model or your own cloud provider. No companion application, Python service or Ollama installation is required by the native plugin.
 
-Game Production AI Assistant is a developer tooling platform designed to augment game developers, technical artists, and production teams working with modern game engines such as Unreal Engine.
+## Current release scope
 
-The project focuses on:
+- Native plugin **0.3.0 beta**, Windows x64, Unreal Engine **5.6 and 5.8**.
+- Local semantic search with bundled MiniLM embeddings; incremental SQLite project index.
+- Asset / Code scopes and opening results in the asset or source editor.
+- Local CPU generation using pinned llama.cpp and optional verified Qwen GGUF downloads.
+- Optional OpenAI Responses or compatible streaming Chat Completions, using a personal key stored in Windows Credential Manager.
+- First-run Quick Start, streamed conversation UI, cancellation and portable settings profiles.
 
-- AI-assisted gameplay programming
-- Production tooling
-- Asset validation
-- Semantic project search
-- Automated pipeline assistance
-- Local-first AI workflows
-- Secure on-premise inference
+Local prompts and project excerpts stay on the PC. Cloud mode sends selected context to the configured provider, whose pricing and data policies apply. Model capability and available context determine answer quality; verify references and generated code. Asset search uses metadata, not complete Blueprint graph analysis. GPU acceleration, macOS and additional Unreal versions are future work.
 
-The goal is to build a production-grade assistant that could realistically integrate into a AAA studio pipeline.
+## Install and use
 
----
+Use the package matching your engine version; keep only one active project/engine copy. Open **Tools > Game Production AI Assistant**. Search works before AI setup. Quick Start downloads the Light model (about 1.04 GiB) and verifies local generation; Settings also supports an explicit Cloud provider choice.
 
-## Why This Project Exists
+[User guide](docs/native-user-guide.md) · [Release notes](docs/native-release-notes.md) · [Fab listing material](docs/fab-listing-draft.md)
 
-Modern AAA game production involves:
+## Architecture
 
-- massive codebases
-- thousands of assets
-- complex build systems
-- technical debt
-- onboarding difficulties
-- repetitive engineering tasks
-
-Existing AI assistants are often:
-
-- cloud dependent
-- not engine-aware
-- not pipeline-aware
-- unsafe for proprietary codebases
-
-Game Production AI Assistant aims to solve this with:
-
-- local inference
-- engine integration
-- production-aware tooling
-- scalable architecture
-- developer-first workflows
-
----
-
-## Core Objectives
-
-### 1. Local-First AI
-
-No external API required.
-
-The assistant should support:
-
-- llama.cpp
-- Ollama
-- local embedding models
-- offline workflows
-
-This makes the project suitable for enterprise and AAA environments.
-
----
-
-### 2. Engine-Aware Tooling
-
-The assistant understands:
-
-- Unreal Engine C++
-- Gameplay Ability System
-- assets
-- metadata
-- Blueprints
-- project structure
-
-Future support:
-
-- Unity
-- proprietary engines
-
----
-
-### 3. Production Pipeline Integration
-
-The assistant should help with:
-
-- asset validation
-- naming conventions
-- dependency analysis
-- build diagnostics
-- profiling analysis
-- crash log analysis
-
----
-
-### 4. Developer Productivity
-
-The project should reduce repetitive tasks:
-
-- boilerplate generation
-- gameplay scaffolding
-- documentation lookup
-- semantic code search
-- commit review assistance
-
----
-
-## Example Use Cases
-
-### Semantic Search
-
-```txt
-Where is enemy perception initialized?
+```mermaid
+flowchart LR
+    Slate[Editor widgets] --> App[Request orchestration / Quick Start]
+    App --> Core[GPAACore: chunking and retrieval]
+    App --> Store[SQLite project index]
+    App --> Inference[GPAAInference]
+    Inference --> MiniLM[Local embeddings]
+    Inference --> Local[Local llama.cpp generation]
+    Inference --> Cloud[User-selected cloud endpoint]
 ```
 
-### Gameplay Boilerplate Generation
+| Area | Responsibility |
+|---|---|
+| `plugin/Source/GPAACore` | Documents, passages, chunking, ranking and provider contracts |
+| `plugin/Source/GPAAInference` | Embeddings, local model lifecycle/download integrity, local/cloud streaming and cancellation |
+| `plugin/Source/GPAAssistant/Private/Application` | Project retrieval and request orchestration; Quick Start controller |
+| `plugin/Source/GPAAssistant/Private/UI` | Main editor panel, conversation view and Quick Start presentation |
+| `plugin/Source/GPAAssistant/Private/Infrastructure` | SQLite transactions and Windows credential storage |
+| `scripts` | Pinned dependency preparation, packaging, exact-archive acceptance and release guards |
 
-```txt
-Create a replicated dash ability using GAS.
+The C# projects are the **retained reference backend**, not an installation requirement for the native plugin. They show the earlier ports/adapters implementation and have their own hosted CI checks. See [reference developer guide](docs/developer-guide.md).
+
+## Build and validate
+
+Native build prerequisites: Windows, a supported Unreal installation, Visual Studio C++ tools and CMake. Dependency/model-card downloads are pinned by SHA256; chat weights are excluded from distribution archives.
+
+```powershell
+./scripts/package-native-plugin.ps1 -UnrealEngineRoot 'C:\Program Files\Epic Games\UE_5.8'
+./scripts/test-native-plugin.ps1 -UnrealEngineRoot 'C:\Program Files\Epic Games\UE_5.8' `
+  -PackagePath .gpaa/releases/GameProductionAIAssistant-native-v0.3.0-UE5.8-Win64.zip -TestFilter GPAA
 ```
 
-### Asset Validation
+The automated suite covers retrieval, persistence/migration, streaming, credentials UI, request cancellation, setup reset, conversation geometry and no-cloud-fallback behavior. Optional real-model acceptance is separate; passing fixture tests is not a guarantee of semantic accuracy on every project.
 
-```txt
-Find textures larger than 4K without mipmaps.
+Reference backend: use .NET SDK 10 and runtime 8.
+
+```powershell
+dotnet build GameProductionAIAssistant.slnx --configuration Release
+dotnet run --project GPAA.Tests/GPAA.Tests.csproj --configuration Release --no-build
 ```
 
-### Build Diagnostics
+## Releases and contributions
 
-```txt
-Analyze this Unreal packaging failure.
-```
+Version tags `vMAJOR.MINOR.PATCH` on reviewed `main` history request builds in a **separate private build repository**. The persistent PC runner is not intended to execute public PRs. After validation, complete ZIPs and checksums are published as GitHub Release assets; visibility follows the source repository. Fab submission remains a separate publisher action.
 
----
+[Release setup and tag instructions](docs/releasing.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
-## High-Level Architecture
+## License and third-party components
 
-```txt
-+------------------------------------------------------+
-| Unreal Engine Plugin                                 |
-|------------------------------------------------------|
-| - Slate UI                                           |
-| - Editor Integration                                 |
-| - Asset Context                                      |
-| - Gameplay Helpers                                   |
-+-----------------------+------------------------------+
-                        |
-                        v
-+------------------------------------------------------+
-| Backend Orchestrator (.NET 8)                        |
-|------------------------------------------------------|
-| - AI orchestration                                   |
-| - Embedding pipeline                                 |
-| - Semantic search                                    |
-| - Project indexing                                   |
-| - Task execution                                     |
-+-----------------------+------------------------------+
-                        |
-                        v
-+------------------------------------------------------+
-| Local AI Runtime                                     |
-|------------------------------------------------------|
-| - llama.cpp                                          |
-| - Ollama                                             |
-| - Embedding models                                   |
-+------------------------------------------------------+
-```
+Original project code is under [MIT](LICENSE), copyright 2026 Maxime Esprit. This permits commercial reuse with the required notice. Third-party software retains its own licenses; the project license does not license Unreal Engine itself.
 
----
+Read the [native dependency inventory](docs/native-third-party-notices.md). Supported engine installations supply their own engine dependencies. Distribution of editor binaries must respect applicable Unreal terms.
 
-## Technology Stack
-
-### Core
-
-- C++
-- C# / .NET 8
-- Unreal Engine
-- SQLite
-- REST/gRPC
-
-### AI
-
-- llama.cpp
-- Ollama
-- sentence-transformers
-- local embeddings
-
-### Parsing & Indexing
-
-- tree-sitter
-- Clang tooling
-
-### Future
-
-- vector databases
-- distributed indexing
-- CI integrations
-
----
-
-## Roadmap
-
-### V1 — Foundation
-
-- Unreal plugin
-- local chat
-- project indexing
-- semantic search
-- local inference support
-
-### V2 — Production Tooling
-
-- asset validation
-- gameplay code generation
-- dependency graph analysis
-- build diagnostics
-
-### V3 — Studio Pipeline
-
-- CI integration
-- multi-user knowledge base
-- automated review assistant
-- profiling analysis
-
----
-
-## Open Source Goals
-
-The project aims to demonstrate:
-
-- production-grade architecture
-- clean tooling design
-- modern C++ practices
-- scalable backend systems
-- AI integration in game production
-
----
-
-## Target Audience
-
-- Gameplay programmers
-- Engine programmers
-- Technical artists
-- Tools engineers
-- Build engineers
-- Technical directors
-
----
-
-## Non-Goals
-
-This project is **not**:
-
-- a cloud SaaS
-- a generic chatbot
-- a game engine replacement
-- a simple Copilot clone
-
-The focus is production tooling for game development.
-
----
-
-## Long-Term Vision
-
-Become an extensible AI tooling platform for game production pipelines.
-
-Potential future directions:
-
-- multi-engine support
-- autonomous pipeline agents
-- AI-assisted debugging
-- automated optimization suggestions
-- production analytics
-
----
-
-## License
-
-MIT
-
----
-
-## Status
-
-Early architecture phase.
+Support: **contact@maximeesprit.fr**. Please redact keys and private project content from reports.

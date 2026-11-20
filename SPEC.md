@@ -61,6 +61,28 @@ The following features are out of scope for V1:
 - Linux
 - macOS
 
+### Unreal Engine Compatibility
+
+The Unreal plugin should support long-lived productions that are frozen on a specific Unreal Engine version.
+
+Requirements:
+
+- maintain a documented Unreal Engine compatibility matrix;
+- validate each supported Unreal version independently;
+- keep core plugin behavior available on older supported versions;
+- isolate version-specific APIs behind Unreal integration adapters;
+- avoid mandatory dependencies on experimental Unreal features for baseline workflows.
+
+Baseline workflows are:
+
+- plugin load;
+- settings persistence;
+- backend connectivity checks;
+- project indexing;
+- semantic search;
+- project-aware ask;
+- opening referenced source files.
+
 ---
 
 ## 5. Architecture
@@ -351,6 +373,11 @@ Semantic Retrieval
 - HTTP module
 - Slate
 
+### Optional Unreal Integrations
+
+- Unreal MCP / `ModelContextProtocol` for newer engine versions that provide it.
+- Engine-specific adapter modules for version-gated editor automation.
+
 ---
 
 ## 16. Risks
@@ -361,6 +388,9 @@ Semantic Retrieval
 - embedding performance
 - large project indexing
 - token limits
+- Unreal Engine API drift across supported versions
+- experimental Unreal MCP API changes
+- unsafe project modifications if agentic workflows are not gated by explicit user approval
 
 ---
 
@@ -373,12 +403,29 @@ Semantic Retrieval
 - gameplay boilerplate generation
 - dependency graph analysis
 
+### V2.x
+
+- Unreal Engine compatibility matrix
+- multi-version plugin package validation
+- version-gated Unreal integration adapters
+- optional Unreal MCP detection
+- MCP tool discovery and capability mapping
+- explicit user approval flow for editor-modifying tool calls
+
 ### V3
 
 - CI assistant
 - profiling analysis
 - crash diagnosis
 - automated review assistant
+
+### V4
+
+- controlled project modifications through Unreal MCP where available
+- plan-and-execute workflows with review checkpoints
+- action history for editor automation
+- rollback guidance for supported modifications
+- studio policy packs for validated automation
 
 ---
 

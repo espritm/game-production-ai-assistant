@@ -1,0 +1,50 @@
+name: .NET CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dotnet-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+        with:
+          persist-credentials: false
+
+      - name: Set up build SDK and .NET 8 runtime
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          # .slnx requires a recent SDK; the application still targets .NET 8.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore GameProductionAIAssistant.slnx
+
+      - name: Build solution
+        run: dotnet build GameProductionAIAssistant.slnx --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet run --project GPAA.Tests/GPAA.Tests.csproj --configuration Release --no-build
+
+      - name: Test plugin package verifier
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/verify-plugin-package.Tests.ps1
