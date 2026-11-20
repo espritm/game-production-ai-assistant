@@ -1,17 +1,20 @@
-# Third-party software declaration — copy-ready inventory
+# Third-party declaration — 0.3.0
 
-Product: Game Production AI Assistant 0.2.0. Publisher: Maxime ESPRIT. Windows x64 editor plugin.
+Publisher: Maxime ESPRIT. Free Windows x64 editor plugin. This inventory supports the publisher's live declaration; it is not an automatic approval.
 
-| Component | Version / source | License | Distributed files / use |
+| Component | Version / origin | License | Distribution / use |
 |---|---|---|---|
-| ONNX Runtime CPU | Microsoft / ONNX contributors, 1.20.1; https://github.com/microsoft/onnxruntime/releases/tag/v1.20.1 | MIT plus retained upstream third-party notices | C API header and gpaa_onnxruntime.dll under Source/ThirdParty/OnnxRuntime; embedded search inference |
-| all-MiniLM-L6-v2 | sentence-transformers; revision 1110a243fdf4706b3f48f1d95db1a4f5529b4d41; https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2 | Apache-2.0 | ONNX model and vocabulary under Source/ThirdParty/MiniLM; model card and license included |
-| SQLiteCore and ICU | Supported Unreal Engine installation | Supplied under the engine distribution terms/notices | Engine dependencies, not separately redistributed as downloads |
-| Windows Credential Manager and desktop dialogs | Windows / Unreal platform APIs | System/engine functionality | No installer distributed; personal credentials and file selection |
-| Optional cloud AI service | User-selected OpenAI Responses or compatible Chat Completions endpoint | User's provider service terms | No service entitlement, key or credits bundled; selected excerpts sent only for cloud chat after consent |
+| ONNX Runtime CPU | Microsoft/ONNX, 1.20.1; github.com/microsoft/onnxruntime | MIT, retained upstream third-party notices | Header and renamed gpaa_onnxruntime.dll for embeddings |
+| all-MiniLM-L6-v2 | sentence-transformers, revision 1110a243fdf4706b3f48f1d95db1a4f5529b4d41 | Apache-2.0 | Bundled ONNX search model, vocabulary, license and model card |
+| llama.cpp / ggml CPU | ggml-org/llama.cpp b12284 | MIT | Pinned source-built static native inference libraries and notices; no server or separate executable |
+| Qwen2.5-Coder 1.5B Instruct GGUF | Official Qwen Hugging Face repository, revision f86cb2c1fa58255f8052cc32aeede1b7482d4361 | Apache-2.0 | Optional user-requested Light download; weights not bundled, license/card retained |
+| Qwen2.5-Coder 7B Instruct GGUF | Official Qwen Hugging Face repository, revision 13fb94bfda8c8cf22497dc57b78f391a9acb426a | Apache-2.0 | Optional user-requested Larger download; weights not bundled, license/card retained |
+| SQLiteCore, ICU, Slate/editor/platform modules | Installed supported Unreal Engine | Engine-supplied licenses/notices | Build/runtime dependencies supplied through Unreal |
+| Credential Manager, native dialogs and HTTPS | Windows / Unreal platform APIs | System/engine functionality | No separate installer; key storage, file selection and model transport |
+| Optional cloud AI endpoint | User-selected OpenAI Responses or compatible Chat Completions | Provider service terms | No entitlement, key or credits supplied; selected context sent only in Cloud mode |
 
-Own code retains the repository MIT license. Upstream DLL is renamed to gpaa_onnxruntime.dll solely to avoid library basename conflicts. No third-party project assets, sample animations, fonts or executables are added to the downloadable plugin. Gallery uses rasterized system-font text, an original vector-style icon and a capture of the author's test session; test project assets are not included.
+Original code retains MIT. Pinning and hashes are documented in scripts/native-dependencies.lock.json and native-third-party-notices.md. Retain full upstream notices in repackaged archives. Unknown user-selected GGUF files have their own licenses and compatibility requirements.
 
-The software was developed with AI assistance and contains a pretrained model for local embeddings, plus optional cloud AI functionality. Gallery graphics were rendered procedurally; no generative AI image output was used. Answer the live portal's disclosure questions according to their actual wording; this document is not an automatic declaration to Epic.
+The product was developed with AI assistance and contains pretrained search weights plus optional downloaded chat models and cloud generation. Branding/gallery layouts are procedural, not generative image output. The UI preview uses the compiled Slate widgets and an explicitly seeded example conversation; it does not pretend to be a fresh model evaluation. The screenshot includes no credential or real private project source. No demo project or third-party scene/animation assets are distributed.
 
-Dependency SHA256 values are in native-dependencies.lock.json (included in the local submission dossier). The source/binary archives retain the upstream license texts and notices. See native-third-party-notices.md for more detail.
+Answer the current portal's disclosure questions according to their exact wording. Applicable Unreal distribution restrictions are separate from the MIT license on original code.

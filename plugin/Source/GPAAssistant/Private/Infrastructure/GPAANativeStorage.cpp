@@ -44,7 +44,7 @@ FGPAANativeStorage::FGPAANativeStorage(const FString &DatabasePath)
     int32 Version = 0;
     if (!Database.GetUserVersion(Version))
         InitializationError = Database.GetLastError();
-    if (Version > 3)
+    if (Version > 4)
         InitializationError = TEXT("This index was created by a newer plugin. Restore that version before opening it.");
     else if (Version < 2 && InitializationError.IsEmpty())
     {
@@ -75,6 +75,16 @@ FGPAANativeStorage::FGPAANativeStorage(const FString &DatabasePath)
             InitializationError = Database.GetLastError();
             Database.Execute(TEXT("ROLLBACK;"));
         }
+        else Version = 3;
+    }
+    if (Version < 4 && InitializationError.IsEmpty())
+    {
+        if (!Database.Execute(TEXT("BEGIN IMMEDIATE;")))
+        { InitializationError = Database.GetLastError(); return; }
+        if (!ExecuteBatch(Database, TEXT("ALTER TABLE history ADD COLUMN provider TEXT NOT NULL DEFAULT '';"
+                                        "ALTER TABLE history ADD COLUMN model TEXT NOT NULL DEFAULT '';")) ||
+            !Database.SetUserVersion(4) || !Database.Execute(TEXT("COMMIT;")))
+        { InitializationError = Database.GetLastError(); Database.Execute(TEXT("ROLLBACK;")); }
     }
 }
 bool FGPAANativeStorage::IsReady(FString &Error) const
@@ -213,16 +223,17 @@ bool FGPAANativeStorage::Replace(const FGPAASnapshot &Value, FString &Error)
     return false;
 }
 bool FGPAANativeStorage::AddHistory(const FString &Question, const FString &Answer, bool Complete, FString &Error,
-                                    const FString &SourcesJson, const FString& Kind, const FString& Scope)
+                                    const FString &SourcesJson, const FString& Kind, const FString& Scope, const FString& Provider, const FString& Model)
 {
     if (!IsReady(Error))
         return false;
     auto Row = Database.PrepareStatement(
-        TEXT("INSERT INTO history(question,answer,created,complete,sources,kind,scope) VALUES(?1,?2,?3,?4,?5,?6,?7)"));
+        TEXT("INSERT INTO history(question,answer,created,complete,sources,kind,scope,provider,model) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)"));
     if (Row.IsValid() && Row.SetBindingValueByIndex(1, Question) && Row.SetBindingValueByIndex(2, Answer) &&
         Row.SetBindingValueByIndex(3, FDateTime::UtcNow().ToIso8601()) &&
         Row.SetBindingValueByIndex(4, Complete ? 1 : 0) && Row.SetBindingValueByIndex(5, SourcesJson) &&
         Row.SetBindingValueByIndex(6, Kind) && Row.SetBindingValueByIndex(7, Scope) &&
+        Row.SetBindingValueByIndex(8, Provider) && Row.SetBindingValueByIndex(9, Model) &&
         Row.Step() == ESQLitePreparedStatementStepResult::Done)
         return true;
     Error = Database.GetLastError();
@@ -233,7 +244,7 @@ FString FGPAANativeStorage::History(FString &Error)
     if (!IsReady(Error))
         return {};
     auto Rows = Database.PrepareStatement(
-        TEXT("SELECT question,answer,created,complete,sources,kind,scope FROM history ORDER BY id DESC LIMIT 30"));
+        TEXT("SELECT question,answer,created,complete,sources,kind,scope,provider,model FROM history ORDER BY id DESC LIMIT 30"));
     if (!Rows.IsValid())
     {
         Error = Database.GetLastError();
@@ -243,7 +254,7 @@ FString FGPAANativeStorage::History(FString &Error)
     ESQLitePreparedStatementStepResult Step;
     while ((Step = Rows.Step()) == ESQLitePreparedStatementStepResult::Row)
     {
-        FString Q, A, Time, Kind, Scope;
+        FString Q, A, Time, Kind, Scope, Provider, Model;
         int32 Complete = 0;
         Rows.GetColumnValueByIndex(0, Q);
         Rows.GetColumnValueByIndex(1, A);
@@ -251,12 +262,15 @@ FString FGPAANativeStorage::History(FString &Error)
         Rows.GetColumnValueByIndex(3, Complete);
         Rows.GetColumnValueByIndex(5, Kind);
         Rows.GetColumnValueByIndex(6, Scope);
+        Rows.GetColumnValueByIndex(7, Provider);
+        Rows.GetColumnValueByIndex(8, Model);
         const bool Search = Kind == TEXT("Search");
         const FString ScopeLabel = Scope == TEXT("Assets") ? TEXT("Asset") : (Scope == TEXT("Code") ? TEXT("Code") : TEXT("Asset and Code"));
         Result += Time + (Search ? TEXT(" [Search — ") + ScopeLabel + TEXT("]") : TEXT(" [Prompt]")) +
                   (Complete ? TEXT("") : TEXT(" [interrupted]")) +
                   (Search ? TEXT("\nSearch: ") : TEXT("\nQ: ")) + Q +
                   (Search ? TEXT("\nResults: ") : TEXT("\nA: ")) + A + TEXT("\n\n");
+        if (!Search && !Provider.IsEmpty()) Result += TEXT("Provider: ") + Provider + TEXT(" | Model: ") + Model + TEXT("\n\n");
         FString Sources;
         Rows.GetColumnValueByIndex(4, Sources);
         if (Sources != TEXT("[]"))

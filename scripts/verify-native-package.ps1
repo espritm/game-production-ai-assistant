@@ -9,13 +9,13 @@ foreach ($directory in @('Config','Content','Resources','Source')) {
 }
 foreach ($file in $files) {
     $relative=$file.FullName.Substring($resolved.Length+1) -replace '\\','/'
-    if ($relative -match '(^|/)(Intermediate|Saved|\.gpaa|\.git|obj)(/|$)' -or $relative -match '\.(exe|msi|pdb|log|user|suo)$' -or $relative -match 'Resources/Backend' -or $file.Name -eq '.gitkeep') { throw "Forbidden native package file: $relative" }
+    if ($relative -match '(^|/)(Intermediate|Saved|\.gpaa|\.git|obj)(/|$)' -or $relative -match '\.(exe|msi|pdb|log|user|suo|gguf)$' -or $relative -match 'Resources/Backend' -or $file.Name -eq '.gitkeep') { throw "Forbidden native package file: $relative" }
     if ($FabSource -and ($relative -match '^(Binaries|Build)/' -or $relative.Length -gt 170)) { throw "Fab source package policy failed: $relative" }
     if ($relative -match '^Source/' -and $relative -notmatch '^Source/ThirdParty/' -and $file.Extension -in @('.cpp','.h','.cs')) {
         if ((Get-Content -LiteralPath $file.FullName -TotalCount 1) -notmatch '^// Copyright .+ 2026\.') { throw "Missing publisher copyright: $relative" }
     }
 }
-$required=@('Resources/Icon128.png','Docs/native-user-guide.txt','Docs/native-release-notes.md','GameProductionAIAssistant.uplugin','Source/GPAACore/GPAACore.Build.cs','Source/GPAAInference/GPAAInference.Build.cs','Source/GPAAssistant/GPAAssistant.Build.cs',
+$required=@('Source/ThirdParty/Llama/Win64/llama.lib','Source/ThirdParty/Llama/Win64/ggml.lib','Source/ThirdParty/Llama/Win64/ggml-base.lib','Source/ThirdParty/Llama/Win64/ggml-cpu.lib','Source/ThirdParty/Llama/build-manifest.json','Resources/Icon128.png','Docs/native-user-guide.txt','Docs/native-release-notes.md','GameProductionAIAssistant.uplugin','Source/GPAACore/GPAACore.Build.cs','Source/GPAAInference/GPAAInference.Build.cs','Source/GPAAssistant/GPAAssistant.Build.cs',
     'Source/ThirdParty/OnnxRuntime/Win64/gpaa_onnxruntime.dll','Source/ThirdParty/OnnxRuntime/LICENSE','Source/ThirdParty/OnnxRuntime/ThirdPartyNotices.txt',
     'Source/ThirdParty/MiniLM/model.onnx','Source/ThirdParty/MiniLM/vocab.txt','Source/ThirdParty/MiniLM/LICENSE','Docs/native-user-guide.md','Docs/native-third-party-notices.md')
 if (-not $FabSource) { $required+=@('Binaries/Win64/UnrealEditor-GPAACore.dll','Binaries/Win64/UnrealEditor-GPAAInference.dll','Binaries/Win64/UnrealEditor-GPAAssistant.dll') }
@@ -32,6 +32,14 @@ foreach ($asset in $lock.assets) {
         $path=Join-Path $resolved $relative
         if (-not (Test-Path -LiteralPath $path) -or (Get-FileHash -LiteralPath $path).Hash -ine $asset.sha256) { throw "Native dependency integrity failed: $path" }
     }
+}
+$localBuild=Get-Content -LiteralPath (Join-Path $resolved 'Source/ThirdParty/Llama/build-manifest.json') -Raw | ConvertFrom-Json
+$localSource=$lock.assets | Where-Object name -eq 'llama-b12284-source.zip'
+if(@($localBuild.files).Count -ne 4){throw 'Local runtime must include four verified static libraries.'}
+if($localBuild.sourceSha256 -ine $localSource.sha256){throw 'Local runtime source identity mismatch.'}
+foreach($file in $localBuild.files){
+ $path=Join-Path $resolved ('Source/ThirdParty/Llama/'+$file.path)
+ if((Get-FileHash -LiteralPath $path).Hash -ine $file.sha256){throw 'Local runtime library integrity failed.'}
 }
 $descriptor=Get-Content -LiteralPath (Join-Path $resolved 'GameProductionAIAssistant.uplugin') -Raw | ConvertFrom-Json
 if (-not $descriptor.EngineVersion -or $descriptor.Modules.Count -ne 3) { throw 'Invalid native plugin descriptor.' }

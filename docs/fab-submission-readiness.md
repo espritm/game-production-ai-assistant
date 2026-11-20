@@ -1,62 +1,46 @@
-# Fab submission preparation — 8 November 2026
+# Fab submission readiness — 0.3.0
 
-Step 4: local dossier preparation. This record is not Fab approval and no upload/submission/publication has been performed.
+Prepared 20 November 2026. This document describes the local dossier, not an Epic approval or submission.
 
-## Acceptance recorded
+## Product and scope
 
-The owner explicitly confirmed that manual UI acceptance, independent Windows-machine installation, and representative real C++ project retrieval (points 1, 2 and 3 of the release checklist) are validated on 8 November 2026. These are owner-attested results. Detailed second-machine/project logs and hardware identifiers were not supplied in this conversation; no such details are invented here. Earlier records describing those gates as pending are superseded by this confirmation.
+- Publisher: Maxime ESPRIT; contact@maximeesprit.fr; free Windows x64 Unreal Editor plugin.
+- Targets: UE 5.6.1 and UE 5.8.4 only. No inferred 5.7/5.9, macOS, Linux, GPU-generation or packaged-game support.
+- Local semantic search; optional local CPU GGUF generation; user-selected cloud generation; guided setup; session conversation; no separate History UI and no new search-history entries.
+- No required companion process, Python service, .NET backend or Ollama installation.
 
-The owner separately validated real animation search/opening, cloud answers grounded in an asset path, and persistent history during development. macOS support is explicitly deferred.
+## Dossier contents
 
-## Local release deliverables
+Run `scripts/new-fab-submission-kit.ps1` after building the exact version for both target engines. It reads the plugin version by default and produces:
 
-- Version 0.2.0 (beta), free Windows x64 Unreal Editor plugin.
-- UE 5.6 and UE 5.8 binary installation ZIPs and source submission ZIPs. Each source ZIP has one plugin parent directory, source modules, Config/Content/Resources, bundled dependencies and licenses; no build outputs, user keys, index or history files.
-- Bundled English user guide as Markdown and plain text, release notes and third-party notices.
-- Copy-ready listing description, technical information, FAQ, support contact and explicit limits: fab-listing-draft.md.
-- Copy-ready dependency/AI disclosure inventory: fab/third-party-declaration.md.
-- Original Icon128.png in the plugin and SVG/512 px branding masters in fab/media.
-- Three checked 1920 x 1080 PNG gallery images, each below 3 MB and together below 25 MB. The second embeds a genuine current plugin capture. Raw screenshots are not placed in the upload dossier.
-- Reproducible local dossier builder: scripts/new-fab-submission-kit.ps1. Its output includes the four archives, documentation, listing copy, media and SHA256SUMS.json.
+- Win64 binary and FabSource ZIPs for each selected engine.
+- English user guide, release notes and native third-party inventory.
+- Current listing copy, third-party declaration, MIT license and dependency lock.
+- Three 1920x1080 gallery images plus product icon and provenance/size inventory.
+- `SHA256SUMS.json`, including every copied payload file, and a transfer ZIP.
 
-## Compatibility and dependency checks
+Source ZIPs contain one plugin directory and required source/dependencies/notices. Chat weights, credentials, project databases, personal logs and demo assets are excluded. Keep generated archives out of Git.
 
-Only Windows x64 and UE 5.6 / 5.8 are advertised. Validation uses installed UE 5.6.1 / 5.8.4. No inferred support for 5.7, macOS, Linux or packaged-game runtime is advertised. Fab rebuilds source plugins against selected versions; its build/review remains separate from our checks.
+## Validation and evidence
 
-ONNX Runtime 1.20.1 CPU is supplied as a DLL with the MIT license and upstream transitive notices. The MiniLM model, vocabulary, model card and Apache-2.0 license are pinned by hash. SQLiteCore and ICU are engine-provided. Runtime dependency inspection previously found Windows/UCRT and Visual C++ libraries, with no direct CLR/.NET import. The independent-machine acceptance is now owner-confirmed.
+The acceptance scripts test exact release archives, not just an IDE build. Required native checks cover storage and migration, code/asset retrieval, cloud transport fixtures, cancellation/shutdown, setup reset, conversation retention, minimum prompt height and Send alignment. Real local-model acceptance is an explicit additional check; its small fixture corpus is not a guarantee of semantic quality on arbitrary code.
 
-Gallery graphics use an original procedural icon and rasterized system-font text; no font files, engine logos or demo assets are added to the downloadable plugin. No generative image model was used for the media. The software was developed with AI assistance and includes pretrained local embeddings and optional cloud AI functionality; answer the actual portal disclosure questions accurately.
+The 0.2 owner-confirmed manual/second-machine checks are historical evidence only. The owner subsequently confirmed the 0.3 UI improvements in development. The release-preparation changes here are maintenance and packaging work; test results and exact final hashes are recorded in the generated evidence/manifests rather than invented in this document.
 
-## Fields completed in step 5 (actual listing creation)
+The gallery UI preview is rendered from compiled Slate widgets offscreen using a seeded example conversation. It is labeled as an interface demonstration, not an actual model evaluation. No private project code or credentials appear. See `fab/media/README.md`.
 
-| Field | Prepared value / action |
-|---|---|
-| Publisher / support | Maxime ESPRIT / contact@maximeesprit.fr |
-| Price | Free; provider API usage billed separately |
-| License | Owner selects the store license in the live form; retain repository MIT and upstream notices |
-| Product ID / FabURL | Use the actual ID assigned by Fab, then rebuild the source archive with that URL; do not invent one |
-| Documentation/download hosting | Bundled local files ready. Repository is private: its URLs are not public customer/download links; choose owner-approved hosting if requested |
-| Media | Three ready PNG files, proposed cover/icon ready for owner preview |
-| Third-party/AI declarations | Copy inventory into the actual portal fields according to their scope |
-| Review / publication | No portal action performed. Preview before submission; publication is a separate step |
+## Public source and CI
 
-## Official requirements consulted
+MIT is retained for original code. Third-party licenses and Unreal terms remain separate. The source repository remains private until an explicit visibility change; private GitHub URLs are not public customer download links.
 
-Checked on 8 November 2026:
+The original runner has been unregistered from the source repository. The release design uses hosted public/source checks and a separate private build controller. Completing the Windows service transfer and recording the two limited tokens described in `releasing.md` are required before claiming the tag pipeline is operational. The private acceptance workflow supports a dry run without creating a GitHub tag or publishing a release.
 
-- [Fab file format and structure guide](https://dev.epicgames.com/documentation/en-us/fab/asset-file-format-and-structure-requirements-in-fab): one plugin per ZIP, source plugin layout, source builds against selected versions, media limits and thorough documentation for tools/plugins.
-- [Publishing workflow](https://dev.epicgames.com/documentation/en-us/fab/publishing-assets-for-sale-or-free-download-in-fab): draft creation, files/media, preview, review submission and activation are distinct steps.
-- [Full technical requirements](https://www.fab.com/o/technical-requirements): public page indicates last update 21 September 2026. Expandable clauses were not fully exposed to the text reader. This dossier does not claim a full clause-by-clause Epic compliance audit; review the live portal and current rules at submission.
+## Portal actions still separate
 
-The public summary specifies gallery images at least 1920 x 1080, JPEG/PNG, under 3 MB each and under 25 MB total. Source archives are not password-protected. No rule specific to UEFN source projects has been applied to this Unreal Editor code plugin without checking scope.
+1. Complete publisher/tax/payment onboarding if Epic still requires it.
+2. Create/update the actual Fab draft; select only tested platform/engine versions and the appropriate live store-license option.
+3. Upload the matching **FabSource** archives, not the entire transfer dossier. Use the included media, listing copy and dependency/AI disclosure inventory.
+4. Add the real Fab URL/ID only after Epic assigns it; rebuild affected source archives and verify them again. No fake placeholder URL is shipped.
+5. Preview and submit for Epic review. A GitHub release does not submit to Fab and a local test does not constitute Fab approval.
 
-## Exact local validation evidence
-
-Final packaged archives pass 24 standard tests on UE 5.8.4 (native-smoke/5cfcd947ca464170bc64451c51f9d5d4) and 24 on UE 5.6.1 (native-smoke/af024479bcb549779763596cb8c729dd). Package policy checks and negative cases (unexpected executable and corrupted dependency) pass. No live provider request was used for these tests. UE 5.6 compilation includes existing engine-header deprecation warnings; the build succeeds.
-
-| Archive | SHA256 |
-|---|---|
-| GameProductionAIAssistant-native-v0.2.0-UE5.6-FabSource.zip | 830768707F3B977A9832C8BEBFF065B3BB5FC7BD74E8E66590BBD9C83126514B |
-| GameProductionAIAssistant-native-v0.2.0-UE5.6-Win64.zip | 847A12DDCF94E96D65359AB3FE2FCEC60E49230615EDC8A66E788D9D670A7361 |
-| GameProductionAIAssistant-native-v0.2.0-UE5.8-FabSource.zip | BEEA6F0F76441CD73EAFD765F2A62B536312CB0D2D340359BE4062D2BB68F8E8 |
-| GameProductionAIAssistant-native-v0.2.0-UE5.8-Win64.zip | A9D791C0D5A195241FFAC1F68C3C9E552327F2C38CEE4B488EFF2E42C1EF243A |
+Applicable references: [Fab plugin file requirements](https://dev.epicgames.com/documentation/fab/asset-file-format-and-structure-requirements-in-fab), [publishing workflow](https://dev.epicgames.com/documentation/fab/publishing-assets-for-sale-or-free-download-in-fab), [licenses/pricing](https://dev.epicgames.com/documentation/fab/licenses-and-pricing-in-fab), and [Unreal EULA](https://www.unrealengine.com/eula/unreal). The publisher must complete the live portal's declarations according to their current wording.

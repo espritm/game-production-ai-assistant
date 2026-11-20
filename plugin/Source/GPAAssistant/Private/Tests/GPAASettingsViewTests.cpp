@@ -16,7 +16,7 @@ void TickSettingsTree(const TSharedRef<SWidget>& Widget)
 {
     // A hidden native window is not ticked by Slate's visible-window traversal.
     // Tick the offscreen tree so virtualized detail rows are actually generated.
-    Widget->Tick(FGeometry::MakeRoot(FVector2D(800, 1000), FSlateLayoutTransform()), FPlatformTime::Seconds(), 1.f / 60.f);
+    Widget->Tick(FGeometry::MakeRoot(FVector2D(1200, 1800), FSlateLayoutTransform()), FPlatformTime::Seconds(), 1.f / 60.f);
     FChildren* Children = Widget->GetChildren();
     for (int32 I = 0; I < Children->Num(); ++I) TickSettingsTree(Children->GetChildAt(I));
 }
@@ -60,10 +60,14 @@ bool FGPAAWaitForSettingsActions::Update()
     Test->TestTrue(TEXT("Credential field and both actions share one horizontal row"), HasCredentialRow(State->View.ToSharedRef()));
     Test->TestFalse(TEXT("Personal settings do not force shared default config"),
         UGPAAEditorSettings::StaticClass()->HasAnyClassFlags(CLASS_DefaultConfig));
+    Test->TestTrue(TEXT("Local model download action available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Download Selected Model")));
+    Test->TestTrue(TEXT("Local AI choice is visible"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Local AI")));
+    Test->TestTrue(TEXT("Cloud AI choice is visible"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Cloud AI Provider")));
+    Test->TestTrue(TEXT("Existing GGUF selection available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Use Downloaded Model")));
     Test->TestTrue(TEXT("Export action remains available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Export Settings Profile")));
     Test->TestTrue(TEXT("Import action remains available"), ContainsSettingsText(State->View.ToSharedRef(), TEXT("Import Settings Profile")));
     for (const TCHAR* Removed : {TEXT("Check Assistant"), TEXT("Test Prompt IA (Billable)"),
-        TEXT("Import Legacy Chat History"), TEXT("Export Profile Path"), TEXT("Import Profile Path"), TEXT("Legacy History Path")})
+        TEXT("Import Legacy Chat History"), TEXT("Export Profile Path"), TEXT("Import Profile Path"), TEXT("Legacy History Path"), TEXT("Cloud Context Accepted")})
         Test->TestFalse(Removed, ContainsSettingsText(State->View.ToSharedRef(), Removed));
     State->Window->RequestDestroyWindow();
     return true;
@@ -79,7 +83,7 @@ bool FGPAASettingsActionsTest::RunTest(const FString& Parameters)
     State->View = Module.CreateDetailView(Args);
     State->View->SetObject(GetMutableDefault<UGPAAEditorSettings>(), true);
     State->Window = SNew(SWindow).Title(FText::FromString(TEXT("GPAA settings acceptance")))
-        .ClientSize(FVector2D(800, 1000))[State->View.ToSharedRef()];
+        .ClientSize(FVector2D(1200, 1800))[State->View.ToSharedRef()];
     FSlateApplication::Get().AddWindow(State->Window.ToSharedRef(), false);
     State->Deadline = FPlatformTime::Seconds() + 10;
     ADD_LATENT_AUTOMATION_COMMAND(FGPAAWaitForSettingsActions(State, this));

@@ -2,6 +2,9 @@
 #include "UI/SGPAAssistantWidget.h"
 
 #include "Application/GPAANativeRuntime.h"
+#include "Application/GPAAQuickStart.h"
+#include "UI/SGPAAQuickStartView.h"
+#include "UI/SGPAAConversationView.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #include "Editor.h"
@@ -10,10 +13,8 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #include "Widgets/Input/SSegmentedControl.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Styling/AppStyle.h"
-#include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
-#include "Widgets/SOverlay.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
@@ -37,36 +38,21 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 namespace
 {
-    const FString SourceOpenerAuto = TEXT("Auto");
-    const FString SourceOpenerVSCode = TEXT("Visual Studio Code");
-    const FString SourceOpenerRider = TEXT("Rider");
-    const FString SourceOpenerVisualStudio = TEXT("Visual Studio");
-    const FString SourceOpenerDefault = TEXT("Default Windows App");
-    const FString SourceOpenerCustom = TEXT("Custom Command");
-    const FString ChatProviderOllama = TEXT("Ollama");
-    const FString ChatProviderOpenAICompatible = TEXT("OpenAICompatible");
-    const FString ChatProviderEcho = TEXT("Echo");
-    const FString SourceFilterAll = TEXT("All");
-    const FString SearchResultFilterCode = TEXT("Code");
-    const FString SearchResultFilterAssets = TEXT("Assets");
-}
+const FString SourceFilterAll = TEXT("All");
+const FString SearchResultFilterCode = TEXT("Code");
+const FString SearchResultFilterAssets = TEXT("Assets");
+} // namespace
 
+// Preserve Slate declarative layout; clang-format treats widget slots as C++ operators.
+// clang-format off
 void SGPAAssistantWidget::Construct(const FArguments& InArgs)
 {
-    InitializeSourceOpenerOptions();
-    InitializeChatProviderOptions();
-    LoadPluginSettings();
 
     ChildSlot
     [
         SNew(SBorder)
         .Padding(12.0f)
         [
-            SAssignNew(MainViewSwitcher, SWidgetSwitcher)
-            .WidgetIndex(0)
-
-            + SWidgetSwitcher::Slot()
-            [
                 SNew(SVerticalBox)
 
                 + SVerticalBox::Slot()
@@ -89,15 +75,6 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
 
                         + SHorizontalBox::Slot()
                         .AutoWidth()
-                        .Padding(0.0f, 0.0f, 8.0f, 0.0f)
-                        [
-                            SNew(SButton)
-                            .Text(LOCTEXT("HistoryButton", "History"))
-                            .OnClicked(this, &SGPAAssistantWidget::OnHistoryClicked)
-                        ]
-
-                        + SHorizontalBox::Slot()
-                        .AutoWidth()
                         [
                             SNew(SButton)
                             .Text(LOCTEXT("OpenSettingsButton", "Settings"))
@@ -114,6 +91,9 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                     SAssignNew(StatusText, STextBlock)
                     .Text(LOCTEXT("ReadyStatus", "Ready"))
                 ]
+
+                + SVerticalBox::Slot().AutoHeight().Padding(0,0,0,8)
+                [SAssignNew(QuickStartView, SGPAAQuickStartView)]
 
                 + SVerticalBox::Slot()
                 .AutoHeight()
@@ -154,33 +134,39 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         .FillHeight(1.0f)
                         .Padding(0.0f, 0.0f, 0.0f, 10.0f)
                         [
-                            SAssignNew(AnswerTextBox, SMultiLineEditableTextBox)
-                            .IsReadOnly(true)
-                            .AutoWrapText(true)
-                            .Text(LOCTEXT("EmptyAnswer", ""))
+                            SAssignNew(Conversation, SGPAAConversationView)
                         ]
 
                         + SVerticalBox::Slot()
                         .AutoHeight()
                         [
-                            SNew(SHorizontalBox)
+                            SAssignNew(PromptInputRow, SHorizontalBox)
 
                             + SHorizontalBox::Slot()
                             .FillWidth(1.0f)
                             .Padding(0.0f, 0.0f, 8.0f, 0.0f)
                             [
-                                SAssignNew(PromptQuestionTextBox, SEditableTextBox)
+                                SNew(SBox).MinDesiredHeight(64).MaxDesiredHeight(160)
+                                [SAssignNew(PromptQuestionTextBox, SMultiLineEditableTextBox)
                                 .HintText(LOCTEXT("QuestionPlaceholder", "Prompt your AI here"))
+                                .AutoWrapText(true)
+                                .ModiferKeyForNewLine(EModifierKey::Shift)
+                                .ToolTipText(LOCTEXT("PromptKeyboardHelp", "Enter to send. Shift+Enter for a new line."))
+                                .OnTextCommitted_Lambda([this](const FText&, ETextCommit::Type CommitType)
+                                {
+                                    if (CommitType == ETextCommit::OnEnter) OnAskClicked();
+                                })]
                             ]
 
                             + SHorizontalBox::Slot()
                             .AutoWidth()
+                            .VAlign(VAlign_Bottom)
                             [
-                                SNew(SButton)
+                                SAssignNew(SendButton, SButton)
                                 .Text(LOCTEXT("SendButton", "Send"))
                                 .OnClicked(this, &SGPAAssistantWidget::OnAskClicked)
                             ]
-                            + SHorizontalBox::Slot().AutoWidth().Padding(8,0,0,0)
+                            + SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(8,0,0,0)
                             [
                                 SAssignNew(PromptCancelButton, SButton)
                                 .Text(LOCTEXT("CancelRequestButton", "Cancel"))
@@ -257,104 +243,31 @@ void SGPAAssistantWidget::Construct(const FArguments& InArgs)
                         ]
                     ]
                 ]
-            ]
-
-            + SWidgetSwitcher::Slot()
-            [
-                SNew(SBorder)
-                .Padding(12.0f)
-                [
-                    SNew(SVerticalBox)
-
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    .Padding(0.0f, 0.0f, 0.0f, 8.0f)
-                    [
-                        SNew(SHorizontalBox)
-
-                        + SHorizontalBox::Slot()
-                        .FillWidth(1.0f)
-                        .VAlign(VAlign_Center)
-                        [
-                            SNew(STextBlock)
-                            .Text(LOCTEXT("HistoryPanelTitle", "History"))
-                        ]
-
-                        + SHorizontalBox::Slot()
-                        .AutoWidth()
-                        [
-                            SNew(SButton)
-                            .Text(LOCTEXT("CloseHistoryButton", "Back"))
-                            .OnClicked(this, &SGPAAssistantWidget::OnCloseHistoryClicked)
-                        ]
-                    ]
-
-                    + SVerticalBox::Slot()
-                    .FillHeight(1.0f)
-                    [
-                        SAssignNew(HistoryTextBox, SMultiLineEditableTextBox)
-                        .IsReadOnly(true)
-                        .AutoWrapText(true)
-                        .Text(LOCTEXT("HistoryEmpty", "No history loaded."))
-                    ]
-                ]
-            ]
         ]
     ];
 
-    AnswerTextBox->SetVAlign(VAlign_Bottom);
-    LoadChatSettings();
+    SetResult(true, TEXT("Provider settings loaded locally."));
 }
+
+// clang-format on
 
 FReply SGPAAssistantWidget::OnOpenSettingsClicked()
 {
-    if (ISettingsModule* SettingsModule = FModuleManager::LoadModulePtr<ISettingsModule>(TEXT("Settings")))
+    if (ISettingsModule *SettingsModule = FModuleManager::LoadModulePtr<ISettingsModule>(TEXT("Settings")))
     {
-        SettingsModule->ShowViewer(
-            TEXT("Project"),
-            TEXT("Plugins"),
-            TEXT("GameProductionAIAssistant"));
+        SettingsModule->ShowViewer(TEXT("Project"), TEXT("Plugins"), TEXT("GameProductionAIAssistant"));
     }
 
-    LoadPluginSettings();
-    return FReply::Handled();
-}
-
-FReply SGPAAssistantWidget::OnLoadChatSettingsClicked()
-{
-    SetBusy(TEXT("Loading chat settings..."));
-    LoadChatSettings();
-    return FReply::Handled();
-}
-
-FReply SGPAAssistantWidget::OnSaveChatSettingsClicked()
-{
-    SetBusy(FString::Printf(TEXT("Saving chat settings for %s..."), *GetSelectedChatProviderName()));
-    SaveChatSettings();
-    return FReply::Handled();
-}
-
-FReply SGPAAssistantWidget::OnHistoryClicked()
-{
-    MainViewSwitcher->SetActiveWidgetIndex(1);
-    HistoryTextBox->SetText(FText::FromString(TEXT("Loading local history...")));
-    TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
-    FGPAANativeRuntime::Get()->LoadHistory(GetProjectRoot(), [Weak](bool Ok, const FString& Message)
-    { if (auto Widget = Weak.Pin()) Widget->SetHistoryResult(Ok, Message); });
-    return FReply::Handled();
-}
-
-FReply SGPAAssistantWidget::OnCloseHistoryClicked()
-{
-    MainViewSwitcher->SetActiveWidgetIndex(0);
     return FReply::Handled();
 }
 
 void SGPAAssistantWidget::OnViewSelectionChanged(int32 Index)
 {
-    if (Index != 0 && Index != 1) return;
+    if (Index != 0 && Index != 1)
+        return;
     ActiveTabIndex = Index;
-    if (TabSwitcher.IsValid()) TabSwitcher->SetActiveWidgetIndex(Index);
+    if (TabSwitcher.IsValid())
+        TabSwitcher->SetActiveWidgetIndex(Index);
 }
 
 FReply SGPAAssistantWidget::OnPromptTabClicked()
@@ -371,52 +284,95 @@ FReply SGPAAssistantWidget::OnSearchTabClicked()
 
 FReply SGPAAssistantWidget::OnSearchClicked()
 {
-    StartNative(false); return FReply::Handled();
+    StartNative(false);
+    return FReply::Handled();
 }
 
 FReply SGPAAssistantWidget::OnAskClicked()
 {
-    StartNative(true); return FReply::Handled();
+    StartNative(true);
+    return FReply::Handled();
 }
 
 SGPAAssistantWidget::~SGPAAssistantWidget()
 {
-    if (bBusy) FGPAANativeRuntime::CancelIfRunning();
+    if (bBusy)
+        FGPAANativeRuntime::CancelIfRunning();
 }
 
 FReply SGPAAssistantWidget::OnCancelClicked()
 {
-    if (!bCancellable) return FReply::Handled();
+    if (!bCancellable)
+        return FReply::Handled();
+    if (bRequestIsAsk && Conversation->HasActiveTurn())
+        FinishPromptTurn(NativeAnswer + TEXT("\n[Cancelled]"));
     NativeRequestId = FGuid::NewGuid();
-    FGPAANativeRuntime::CancelIfRunning(); StopBusy();
+    FGPAANativeRuntime::CancelIfRunning();
+    StopBusy();
     StatusText->SetText(FText::FromString(TEXT("Operation cancelled. Any partial response is kept in local history.")));
     return FReply::Handled();
 }
 
 void SGPAAssistantWidget::StartNative(bool Ask)
 {
-    LoadPluginSettings();
+    if (bBusy)
+    {
+        StatusText->SetText(
+            LOCTEXT("RequestStillRunning", "A request is already running. Wait for it to finish or cancel it first."));
+        return;
+    }
+    if (FGPAAQuickStart::IsRunning())
+    {
+        SetResult(false, TEXT("Wait for Quick Start to finish, or cancel it first."));
+        return;
+    }
     const FString Query = Ask ? GetPromptQuestion() : GetSearchQuery();
-    if (Query.TrimStartAndEnd().IsEmpty()) { SetResult(false, TEXT("Enter a question or search query first.")); return; }
-    NativeRequestId = FGuid::NewGuid(); const FGuid RequestId = NativeRequestId;
+    if (Query.TrimStartAndEnd().IsEmpty())
+    {
+        SetResult(false, TEXT("Enter a question or search query first."));
+        return;
+    }
+    NativeRequestId = FGuid::NewGuid();
+    const FGuid RequestId = NativeRequestId;
     TWeakPtr<SGPAAssistantWidget> Weak = SharedThis(this);
     bCancellable = true;
     bRequestIsAsk = Ask;
-    NativeAnswer.Reset(); SetBusy(TEXT("Preparing local project knowledge..."));
-    if (Ask) SetAnswerText(TEXT(""));
-    FGPAANativeRuntime::Get()->Run(GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, false,
-        [Weak, RequestId](const FString& Message) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) W->SetBusy(Message); },
-        [Weak, RequestId](const FString& Delta) { if (auto W = Weak.Pin()) if (W->NativeRequestId == RequestId) { W->NativeAnswer += Delta; W->SetAnswerText(W->NativeAnswer); } },
-        [Weak, RequestId, Ask](bool Ok, const FString& Message, const FGPAANativeResult& Result)
+    if (Ask)
+        ActiveChatProviderName = GetSelectedChatProviderName();
+    NativeAnswer.Reset();
+    SetBusy(TEXT("Preparing local project knowledge..."));
+    if (Ask)
+        BeginPromptTurn(Query);
+    FGPAANativeRuntime::Get()->Run(
+        GetProjectRoot(), BuildAssetMetadataSyncRequest(), Query, Ask, false,
+        [Weak, RequestId](const FString &Message)
         {
-            auto W = Weak.Pin(); if (!W || W->NativeRequestId != RequestId) return;
+            if (auto W = Weak.Pin())
+                if (W->NativeRequestId == RequestId)
+                    W->SetBusy(Message);
+        },
+        [Weak, RequestId](const FString &Delta)
+        {
+            if (auto W = Weak.Pin())
+                if (W->NativeRequestId == RequestId)
+                {
+                    W->NativeAnswer += Delta;
+                    W->RenderPromptTurn();
+                }
+        },
+        [Weak, RequestId, Ask](bool Ok, const FString &Message, const FGPAANativeResult &Result)
+        {
+            auto W = Weak.Pin();
+            if (!W || W->NativeRequestId != RequestId)
+                return;
             if (Ask)
             {
                 W->SetChatResult(Ok, Message, Result.Answer, Result.Sources);
-                if (!Ok && !Result.Answer.IsEmpty()) W->SetAnswerText(Result.Answer + TEXT("\n\n[Interrupted] ") + Message);
             }
-            else W->SetSearchResult(Ok, Message, Result.Sources);
-        }, Ask ? SourceFilterAll : GetSelectedSourceFilterName());
+            else
+                W->SetSearchResult(Ok, Message, Result.Sources);
+        },
+        Ask ? SourceFilterAll : GetSelectedSourceFilterName());
 }
 
 FString SGPAAssistantWidget::BuildAssetMetadataSyncRequest() const
@@ -424,7 +380,7 @@ FString SGPAAssistantWidget::BuildAssetMetadataSyncRequest() const
     return FGPAAAssetMetadataRequestBuilder::BuildSyncRequest(GetProjectRoot());
 }
 
-void SGPAAssistantWidget::SetBusy(const FString& Message)
+void SGPAAssistantWidget::SetBusy(const FString &Message)
 {
     BusyBaseMessage = Message.TrimEnd();
     BusyFrame = 0;
@@ -433,31 +389,15 @@ void SGPAAssistantWidget::SetBusy(const FString& Message)
     RegisterActiveTimer(0.35f, FWidgetActiveTimerDelegate::CreateSP(this, &SGPAAssistantWidget::HandleBusyTick));
 }
 
-void SGPAAssistantWidget::SetBusyFromWorkflow(bool bSucceeded, const FString& Message)
-{
-    if (bSucceeded)
-    {
-        SetBusy(Message);
-    }
-}
-
-void SGPAAssistantWidget::SetResult(bool bSucceeded, const FString& Message)
+void SGPAAssistantWidget::SetResult(bool bSucceeded, const FString &Message)
 {
     StopBusy();
-    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Ready") : TEXT("Error")));
-    SetAnswerText(Message);
+    StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Ready") : Message));
+    StatusText->SetToolTipText(FText::FromString(Message));
 }
 
-void SGPAAssistantWidget::SetHistoryResult(bool bSucceeded, const FString& Message)
-{
-    if (!bCancellable) StatusText->SetText(FText::FromString(bSucceeded ? TEXT("History loaded") : TEXT("Error")));
-    if (HistoryTextBox.IsValid())
-    {
-        HistoryTextBox->SetText(FText::FromString(Message));
-    }
-}
-
-void SGPAAssistantWidget::SetSearchResult(bool bSucceeded, const FString& Message, const TArray<FGPAASourceReference>& Results)
+void SGPAAssistantWidget::SetSearchResult(bool bSucceeded, const FString &Message,
+                                          const TArray<FGPAASourceReference> &Results)
 {
     StopBusy();
     StatusText->SetText(FText::FromString(bSucceeded ? TEXT("Search complete") : TEXT("Error")));
@@ -466,7 +406,7 @@ void SGPAAssistantWidget::SetSearchResult(bool bSucceeded, const FString& Messag
     SearchResults.Reset();
     if (bSucceeded)
     {
-        for (const FGPAASourceReference& Result : Results)
+        for (const FGPAASourceReference &Result : Results)
         {
             SearchResults.Add(MakeShared<FGPAASourceReference>(Result));
         }
@@ -476,24 +416,50 @@ void SGPAAssistantWidget::SetSearchResult(bool bSucceeded, const FString& Messag
     RefreshSourceLists();
 }
 
-void SGPAAssistantWidget::SetAnswerText(const FString& Text)
+void SGPAAssistantWidget::SetAnswerText(const FString &Text)
 {
-    AnswerTextBox->SetText(FText::FromString(Text));
-    AnswerTextBox->ScrollTo(ETextLocation::EndOfDocument);
+    Conversation->UpdateAnswer(Text);
 }
 
-void SGPAAssistantWidget::SetChatResult(bool bSucceeded, const FString& Message, const FString& Answer, const TArray<FGPAASourceReference>& Sources)
+void SGPAAssistantWidget::BeginPromptTurn(const FString &Prompt)
+{
+    NativeAnswer.Reset();
+    PromptQuestionTextBox->SetText(FText::GetEmpty());
+    Conversation->BeginTurn(Prompt);
+}
+
+void SGPAAssistantWidget::RenderPromptTurn()
+{
+    if (Conversation->HasActiveTurn())
+        Conversation->UpdateAnswer(NativeAnswer);
+}
+
+void SGPAAssistantWidget::FinishPromptTurn(const FString &Answer)
+{
+    Conversation->FinishTurn(Answer);
+}
+
+void SGPAAssistantWidget::SetChatResult(bool bSucceeded, const FString &Message, const FString &Answer,
+                                        const TArray<FGPAASourceReference> &Sources)
 {
     StopBusy();
-    StatusText->SetText(FText::FromString(bSucceeded
-        ? FString::Printf(TEXT("Answer complete via %s"), *GetSelectedChatProviderName())
-        : TEXT("Error")));
-    SetAnswerText(bSucceeded ? Answer : Message);
+    StatusText->SetText(
+        FText::FromString(bSucceeded ? FString::Printf(TEXT("Answer complete via %s"),
+                                                       ActiveChatProviderName.IsEmpty() ? *GetSelectedChatProviderName()
+                                                                                        : *ActiveChatProviderName)
+                                     : TEXT("Error")));
+    FString FinalAnswer = Answer.IsEmpty() ? NativeAnswer : Answer;
+    if (!bSucceeded)
+        FinalAnswer += (FinalAnswer.IsEmpty() ? TEXT("[Error] ") : TEXT("\n\n[Interrupted] ")) + Message;
+    if (Conversation->HasActiveTurn())
+        FinishPromptTurn(FinalAnswer);
+    else
+        SetAnswerText(FinalAnswer);
 
     AnswerSources.Reset();
     if (bSucceeded)
     {
-        for (const FGPAASourceReference& Source : Sources)
+        for (const FGPAASourceReference &Source : Sources)
         {
             AnswerSources.Add(MakeShared<FGPAASourceReference>(Source));
         }
@@ -526,55 +492,34 @@ void SGPAAssistantWidget::StopBusy()
     bCancellable = false;
 }
 
-TSharedRef<ITableRow> SGPAAssistantWidget::GenerateSourceRow(TSharedPtr<FGPAASourceReference> Item, const TSharedRef<STableViewBase>& OwnerTable)
+TSharedRef<ITableRow> SGPAAssistantWidget::GenerateSourceRow(TSharedPtr<FGPAASourceReference> Item,
+                                                             const TSharedRef<STableViewBase> &OwnerTable)
 {
     const FString SourceType = Item.IsValid() && !Item->SourceType.IsEmpty() ? Item->SourceType : TEXT("Code");
     const FString Location = Item.IsValid()
-        ? FString::Printf(TEXT("[%s] %s:%d-%d (score %.3f)"), *SourceType, *Item->RelativePath, Item->StartLine, Item->EndLine, Item->Score)
-        : TEXT("Unknown source");
+                                 ? FString::Printf(TEXT("[%s] %s:%d-%d (score %.3f)"), *SourceType, *Item->RelativePath,
+                                                   Item->StartLine, Item->EndLine, Item->Score)
+                                 : TEXT("Unknown source");
 
     const FString Snippet = Item.IsValid() ? Item->Content : FString();
 
-    return SNew(STableRow<TSharedPtr<FGPAASourceReference>>, OwnerTable)
-        [
-            SNew(SBorder)
-            .Padding(6.0f)
-            [
-                SNew(SHorizontalBox)
+    return SNew(STableRow<TSharedPtr<FGPAASourceReference>>, OwnerTable)[SNew(SBorder).Padding(
+        6.0f)[SNew(SHorizontalBox)
 
-                + SHorizontalBox::Slot()
-                .FillWidth(1.0f)
-                [
-                    SNew(SVerticalBox)
+              + SHorizontalBox::Slot().FillWidth(
+                    1.0f)[SNew(SVerticalBox)
 
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    [
-                        SNew(STextBlock)
-                        .Text(FText::FromString(Location))
-                    ]
+                          + SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Text(FText::FromString(Location))]
 
-                    + SVerticalBox::Slot()
-                    .AutoHeight()
-                    .Padding(0.0f, 4.0f, 0.0f, 0.0f)
-                    [
-                        SNew(STextBlock)
-                        .Text(FText::FromString(Snippet))
-                        .AutoWrapText(true)
-                    ]
-                ]
+                          + SVerticalBox::Slot().AutoHeight().Padding(0.0f, 4.0f, 0.0f, 0.0f)
+                                [SNew(STextBlock).Text(FText::FromString(Snippet)).AutoWrapText(true)]]
 
-                + SHorizontalBox::Slot()
-                .AutoWidth()
-                .Padding(8.0f, 0.0f, 0.0f, 0.0f)
-                .VAlign(VAlign_Center)
-                [
-                    SNew(SButton)
-                    .Text(LOCTEXT("OpenSourceButton", "Open"))
-                    .OnClicked(this, &SGPAAssistantWidget::OnOpenSourceClicked, Item)
-                ]
-            ]
-        ];
+              + SHorizontalBox::Slot()
+                    .AutoWidth()
+                    .Padding(8.0f, 0.0f, 0.0f, 0.0f)
+                    .VAlign(VAlign_Center)[SNew(SButton)
+                                               .Text(LOCTEXT("OpenSourceButton", "Open"))
+                                               .OnClicked(this, &SGPAAssistantWidget::OnOpenSourceClicked, Item)]]];
 }
 
 FReply SGPAAssistantWidget::OnOpenSourceClicked(TSharedPtr<FGPAASourceReference> Item)
@@ -592,153 +537,12 @@ FReply SGPAAssistantWidget::OnOpenSourceClicked(TSharedPtr<FGPAASourceReference>
     return FReply::Handled();
 }
 
-void SGPAAssistantWidget::InitializeSourceOpenerOptions()
-{
-    SourceOpenerModes.Reset();
-    SourceOpenerModes.Add(MakeShared<FString>(SourceOpenerAuto));
-    SourceOpenerModes.Add(MakeShared<FString>(SourceOpenerVSCode));
-    SourceOpenerModes.Add(MakeShared<FString>(SourceOpenerRider));
-    SourceOpenerModes.Add(MakeShared<FString>(SourceOpenerVisualStudio));
-    SourceOpenerModes.Add(MakeShared<FString>(SourceOpenerDefault));
-    SourceOpenerModes.Add(MakeShared<FString>(SourceOpenerCustom));
-    SelectedSourceOpenerMode = SourceOpenerModes[0];
-}
-
-void SGPAAssistantWidget::InitializeChatProviderOptions()
-{
-    ChatProviderModes.Reset();
-    ChatProviderModes.Add(MakeShared<FString>(TEXT("OpenAI")));
-    ChatProviderModes.Add(MakeShared<FString>(ChatProviderOpenAICompatible));
-    SelectedChatProviderMode=ChatProviderModes[0];
-}
-
-void SGPAAssistantWidget::LoadPluginSettings()
-{
-    const UGPAAEditorSettings* Settings = GetDefault<UGPAAEditorSettings>();
-
-    auto SelectStringOption = [](const TArray<TSharedPtr<FString>>& Options, const FString& Value, TSharedPtr<FString>& SelectedOption)
-    {
-        for (const TSharedPtr<FString>& Candidate : Options)
-        {
-            if (Candidate.IsValid() && Candidate->Equals(Value, ESearchCase::IgnoreCase))
-            {
-                SelectedOption = Candidate;
-                return;
-            }
-        }
-    };
-
-    SelectStringOption(SourceOpenerModes, Settings->SourceOpenerMode, SelectedSourceOpenerMode);
-    SelectStringOption(ChatProviderModes, Settings->ChatProvider, SelectedChatProviderMode);
-    CustomSourceOpenerCommand = Settings->CustomSourceOpenerCommand;
-
-    if (SourceOpenerComboBox.IsValid())
-    {
-        SourceOpenerComboBox->SetSelectedItem(SelectedSourceOpenerMode);
-    }
-
-    if (ChatProviderComboBox.IsValid())
-    {
-        ChatProviderComboBox->SetSelectedItem(SelectedChatProviderMode);
-    }
-
-    if (SettingsSummaryText.IsValid())
-    {
-        SettingsSummaryText->SetText(GetSettingsSummaryText());
-    }
-}
-
-void SGPAAssistantWidget::SavePluginSettings() const
-{
-    UGPAAEditorSettings* Settings = GetMutableDefault<UGPAAEditorSettings>();
-    Settings->SourceOpenerMode = SelectedSourceOpenerMode.IsValid() ? *SelectedSourceOpenerMode : SourceOpenerAuto;
-    Settings->CustomSourceOpenerCommand = GetSourceOpenerCommand();
-    Settings->ChatProvider = SelectedChatProviderMode.IsValid() ? *SelectedChatProviderMode : Settings->ChatProvider;
-    Settings->SaveConfig();
-}
-
-
-void SGPAAssistantWidget::LoadChatSettings()
-{
-    LoadPluginSettings(); SetResult(true, TEXT("Provider settings loaded locally."));
-}
-
-void SGPAAssistantWidget::SaveChatSettings()
-{
-    SavePluginSettings(); SetResult(true, TEXT("Provider settings saved. Personal keys are managed in Settings."));
-}
-
-void SGPAAssistantWidget::ApplyChatSettingsResponse(bool bSucceeded, const FString& Message)
-{
-    if (!bSucceeded)
-    {
-        StatusText->SetText(FText::FromString(TEXT("Chat settings unavailable")));
-        return;
-    }
-
-    FGPAAChatSettings Settings;
-    if (!FGPAAApiModels::ParseChatSettings(Message, Settings))
-    {
-        StatusText->SetText(FText::FromString(TEXT("Invalid chat settings response")));
-        return;
-    }
-
-    GetMutableDefault<UGPAAEditorSettings>()->ApplyChatSettings(Settings);
-
-    for (const TSharedPtr<FString>& Candidate : ChatProviderModes)
-    {
-        if (Candidate.IsValid() && Candidate->Equals(Settings.Provider, ESearchCase::IgnoreCase))
-        {
-            SelectedChatProviderMode = Candidate;
-            if (ChatProviderComboBox.IsValid())
-            {
-                ChatProviderComboBox->SetSelectedItem(Candidate);
-            }
-            break;
-        }
-    }
-
-    StatusText->SetText(FText::FromString(FString::Printf(TEXT("Chat provider active: %s"), *GetSelectedChatProviderName())));
-    if (SettingsSummaryText.IsValid())
-    {
-        SettingsSummaryText->SetText(GetSettingsSummaryText());
-    }
-}
-
-FGPAAChatSettings SGPAAssistantWidget::GetChatSettingsFromUi() const
-{
-    return GetDefault<UGPAAEditorSettings>()->ToChatSettings();
-}
-
-void SGPAAssistantWidget::OnSourceOpenerModeChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo)
-{
-    if (NewSelection.IsValid())
-    {
-        SelectedSourceOpenerMode = NewSelection;
-        SavePluginSettings();
-    }
-}
-
-void SGPAAssistantWidget::OnChatProviderChanged(TSharedPtr<FString> NewSelection, ESelectInfo::Type SelectInfo)
-{
-    if (NewSelection.IsValid())
-    {
-        SelectedChatProviderMode = NewSelection;
-        SavePluginSettings();
-        if (StatusText.IsValid())
-        {
-            StatusText->SetText(FText::FromString(FString::Printf(TEXT("Chat provider selected: %s"), *GetSelectedChatProviderName())));
-        }
-    }
-}
-
-TSharedRef<SWidget> SGPAAssistantWidget::MakeSearchScopeRadio(const FText& Label, const FString& Scope)
+TSharedRef<SWidget> SGPAAssistantWidget::MakeSearchScopeRadio(const FText &Label, const FString &Scope)
 {
     return SNew(SCheckBox)
         .Style(FAppStyle::Get(), "RadioButton")
         .IsChecked(this, &SGPAAssistantWidget::GetSearchScopeCheckState, Scope)
-        .OnCheckStateChanged(this, &SGPAAssistantWidget::OnSearchScopeChanged, Scope)
-        [SNew(STextBlock).Text(Label)];
+        .OnCheckStateChanged(this, &SGPAAssistantWidget::OnSearchScopeChanged, Scope)[SNew(STextBlock).Text(Label)];
 }
 ECheckBoxState SGPAAssistantWidget::GetSearchScopeCheckState(FString Scope) const
 {
@@ -746,60 +550,28 @@ ECheckBoxState SGPAAssistantWidget::GetSearchScopeCheckState(FString Scope) cons
 }
 void SGPAAssistantWidget::OnSearchScopeChanged(ECheckBoxState State, FString Scope)
 {
-    if (State != ECheckBoxState::Checked) return;
+    if (State != ECheckBoxState::Checked)
+        return;
     SelectedSearchScope = Scope;
     RebuildFilteredSearchResults();
     RefreshSourceLists();
 }
 
-void SGPAAssistantWidget::OnCustomSourceOpenerCommitted(const FText& Text, ETextCommit::Type CommitType)
-{
-    CustomSourceOpenerCommand = Text.ToString();
-    SavePluginSettings();
-}
-
-TSharedRef<SWidget> SGPAAssistantWidget::GenerateSourceOpenerModeWidget(TSharedPtr<FString> Item) const
-{
-    return SNew(STextBlock)
-        .Text(FText::FromString(Item.IsValid() ? *Item : SourceOpenerAuto));
-}
-
-TSharedRef<SWidget> SGPAAssistantWidget::GenerateChatProviderWidget(TSharedPtr<FString> Item) const
-{
-    return SNew(STextBlock)
-        .Text(FText::FromString(Item.IsValid() ? *Item : ChatProviderOllama));
-}
-
-FText SGPAAssistantWidget::GetSelectedSourceOpenerModeText() const
-{
-    return FText::FromString(SelectedSourceOpenerMode.IsValid() ? *SelectedSourceOpenerMode : SourceOpenerAuto);
-}
-
-FText SGPAAssistantWidget::GetSelectedChatProviderText() const
-{
-    return FText::FromString(SelectedChatProviderMode.IsValid() ? *SelectedChatProviderMode : ChatProviderOllama);
-}
-
 FText SGPAAssistantWidget::GetSettingsSummaryText() const
 {
-    const auto* Settings=GetDefault<UGPAAEditorSettings>();
-    return FText::FromString(FString::Printf(TEXT("Provider: %s | Model: %s | Search: local"),*Settings->ChatProvider,*Settings->OpenAIModel));
+    const auto *Settings = GetDefault<UGPAAEditorSettings>();
+    if (Settings->ChatProvider.IsEmpty())
+        return LOCTEXT(
+            "SetupRequired",
+            "Setup required — use Quick Start or choose an AI provider in Settings. Search is available locally.");
+    const FString Model =
+        Settings->ChatProvider == TEXT("Local")
+            ? (Settings->LocalModelFile.IsEmpty() ? Settings->LocalModelId
+                                                  : FPaths::GetCleanFilename(Settings->LocalModelFile))
+            : Settings->OpenAIModel;
+    return FText::FromString(
+        FString::Printf(TEXT("Provider: %s | Model: %s | Search: local"), *Settings->ChatProvider, *Model));
 }
-
-EVisibility SGPAAssistantWidget::GetCustomSourceOpenerVisibility() const
-{
-    return SelectedSourceOpenerMode.IsValid() && *SelectedSourceOpenerMode == SourceOpenerCustom
-        ? EVisibility::Visible
-        : EVisibility::Collapsed;
-}
-
-EVisibility SGPAAssistantWidget::GetOpenAICompatibleSettingsVisibility() const
-{
-    return SelectedChatProviderMode.IsValid() && *SelectedChatProviderMode == ChatProviderOpenAICompatible
-        ? EVisibility::Visible
-        : EVisibility::Collapsed;
-}
-
 
 FString SGPAAssistantWidget::GetProjectRoot() const
 {
@@ -835,21 +607,20 @@ void SGPAAssistantWidget::RebuildFilteredSearchResults()
 {
     FilteredSearchResults.Reset();
 
-    const FString& Filter = SelectedSearchScope;
+    const FString &Filter = SelectedSearchScope;
 
-    for (const TSharedPtr<FGPAASourceReference>& Result : SearchResults)
+    for (const TSharedPtr<FGPAASourceReference> &Result : SearchResults)
     {
         if (!Result.IsValid())
         {
             continue;
         }
 
-        const bool bIsAsset = Result->SourceType.Equals(TEXT("Asset"), ESearchCase::IgnoreCase)
-            || Result->SourceType.Equals(SearchResultFilterAssets, ESearchCase::IgnoreCase);
-        const bool bShouldShow =
-            Filter.Equals(SourceFilterAll, ESearchCase::IgnoreCase)
-            || (Filter.Equals(SearchResultFilterCode, ESearchCase::IgnoreCase) && !bIsAsset)
-            || (Filter.Equals(SearchResultFilterAssets, ESearchCase::IgnoreCase) && bIsAsset);
+        const bool bIsAsset = Result->SourceType.Equals(TEXT("Asset"), ESearchCase::IgnoreCase) ||
+                              Result->SourceType.Equals(SearchResultFilterAssets, ESearchCase::IgnoreCase);
+        const bool bShouldShow = Filter.Equals(SourceFilterAll, ESearchCase::IgnoreCase) ||
+                                 (Filter.Equals(SearchResultFilterCode, ESearchCase::IgnoreCase) && !bIsAsset) ||
+                                 (Filter.Equals(SearchResultFilterAssets, ESearchCase::IgnoreCase) && bIsAsset);
 
         if (bShouldShow)
         {
@@ -864,7 +635,6 @@ void SGPAAssistantWidget::RefreshSourceLists()
     {
         SearchResultsListView->RequestListRefresh();
     }
-
 }
 
 #undef LOCTEXT_NAMESPACE

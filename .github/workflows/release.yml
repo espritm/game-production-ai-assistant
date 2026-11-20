@@ -1,0 +1,35 @@
+name: Release request
+on:
+  push:
+    tags: ['v*.*.*']
+permissions:
+  contents: read
+concurrency:
+  group: release-request-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify tagged main commit and matching version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $commit = git rev-parse HEAD
+          & ./scripts/assert-release-ref.ps1 -Tag $env:RELEASE_TAG -ExpectedCommit $commit
+          "SOURCE_COMMIT=$commit" >> $env:GITHUB_ENV
+      - name: Request isolated private build
+        env:
+          GH_TOKEN: ${{ secrets.BUILD_DISPATCH_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          test -n "$GH_TOKEN" || { echo 'Configure BUILD_DISPATCH_TOKEN before pushing release tags.'; exit 1; }
+          python -c 'import json,os; print(json.dumps({"ref":"main","inputs":{"source_tag":os.environ["RELEASE_TAG"],"source_sha":os.environ["SOURCE_COMMIT"]}}))' | \
+            gh api --method POST repos/espritm/gpaa-unreal-builds/actions/workflows/release.yml/dispatches --input -
+          echo 'Build requested in the private build repository. Downloads appear on this repository release after validation.'

@@ -66,6 +66,12 @@ struct FGPAAChatRequest
 {
     FString Endpoint, Model, Key, Prompt;
     bool Responses = true;
+    bool Local = false, LocalCustomModel = false;
+    bool RequireProjectEvidence = false, HasProjectEvidence = false;
+    FString LocalModelPath;
+    FString SourceEvidence;
+    TFunction<void(const FString&)> OnStatus;
+    int32 LocalContextTokens = 4096, LocalThreads = 4;
     int32 MaxOutputTokens = 512;
     float Timeout = 120;
 };

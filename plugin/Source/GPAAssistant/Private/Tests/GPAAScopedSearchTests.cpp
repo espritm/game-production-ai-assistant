@@ -20,7 +20,8 @@ bool FGPAAWaitForScopedSearch::Update()
     FString HistoryError;
     FGPAANativeStorage Store(FGPAANativeRuntime::DatabasePath(State->Root));
     const FString History=Store.History(HistoryError);
-    Test->TestTrue(TEXT("Completed search is persisted before UI completion"),History.Contains(TEXT("[Search — Asset]")) && History.Contains(TEXT("stamina regeneration")) && History.Contains(TEXT("asset:/Game/Stamina.Stamina")));
+    Test->TestEqual(TEXT("Search history remains empty"), History, FString(TEXT("No local activity yet.")));
+    Test->TestTrue(TEXT("Reading history succeeds"), HistoryError.IsEmpty());
     if (!State->Error.IsEmpty()) Test->AddError(State->Error);
     return true;
 }

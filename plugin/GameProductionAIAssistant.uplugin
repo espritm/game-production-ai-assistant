@@ -1,9 +1,9 @@
 {
   "FileVersion": 3,
-  "Version": 2,
-  "VersionName": "0.2.0",
+  "Version": 3,
+  "VersionName": "0.3.0",
   "FriendlyName": "Game Production AI Assistant",
-  "Description": "Local project search and source-aware cloud chat inside Unreal Editor. Windows x64; personal API key required for cloud chat.",
+  "Description": "Local project search and local or cloud AI chat inside Unreal Editor. Windows x64; download a local model or configure a cloud provider.",
   "Category": "AI",
   "CreatedBy": "Maxime ESPRIT",
   "CanContainContent": false,

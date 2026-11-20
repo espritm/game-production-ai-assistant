@@ -2,6 +2,7 @@
 #include "Misc/AutomationTest.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "UI/SGPAAssistantWidget.h"
+#include "UI/SGPAAConversationView.h"
 #include "Widgets/Input/SSegmentedControl.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
@@ -20,14 +21,11 @@ bool FGPAAViewSelectorTest::RunTest(const FString& Parameters)
     Panel->OnViewSelectionChanged(1);
     TestEqual(TEXT("Search selection displays search"), Panel->TabSwitcher->GetActiveWidgetIndex(), 1);
     TestEqual(TEXT("Selection state agrees with content"), Panel->ActiveTabIndex, 1);
-    Panel->OnHistoryClicked();
-    Panel->OnCloseHistoryClicked();
-    TestEqual(TEXT("History Back preserves selected view"), Panel->TabSwitcher->GetActiveWidgetIndex(), 1);
     Panel->OnViewSelectionChanged(0);
     TestEqual(TEXT("Prompt selection restores prompt"), Panel->TabSwitcher->GetActiveWidgetIndex(), 0);
     TestEqual(TEXT("Prompt text retained"), Panel->GetPromptQuestion(), FString(TEXT("Keep this prompt")));
     TestEqual(TEXT("Search text retained"), Panel->GetSearchQuery(), FString(TEXT("Keep this search")));
-    TestEqual(TEXT("Answer retained"), Panel->AnswerTextBox->GetText().ToString(), FString(TEXT("Keep this answer")));
+    TestEqual(TEXT("Answer retained"), Panel->Conversation->AnswerTextBox->GetText().ToString(), FString(TEXT("Keep this answer")));
     Panel->OnViewSelectionChanged(-1);
     TestEqual(TEXT("Invalid selection cannot hide both views"), Panel->TabSwitcher->GetActiveWidgetIndex(), 0);
     return true;

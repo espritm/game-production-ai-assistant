@@ -2,6 +2,7 @@
 #include "Misc/AutomationTest.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "UI/SGPAAssistantWidget.h"
+#include "Settings/GPAAEditorSettings.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/Text/STextBlock.h"
@@ -39,14 +40,18 @@ bool FGPAACancelUiTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Busy alone does not expose cancellation"),Panel->GetRequestCancelVisibility(false)==EVisibility::Collapsed);
     Panel->bCancellable=true; Panel->bRequestIsAsk=true;
     TestTrue(TEXT("Only Send cancellation is visible during prompt request"),Panel->GetRequestCancelVisibility(true)==EVisibility::Visible && Panel->GetRequestCancelVisibility(false)==EVisibility::Collapsed);
-    Panel->SetHistoryResult(true,TEXT("history"));
-    TestTrue(TEXT("History load cannot clear live prompt cancellation"),Panel->GetRequestCancelVisibility(true)==EVisibility::Visible);
     Panel->bRequestIsAsk=false;
     TestTrue(TEXT("Only Search cancellation is visible during search"),Panel->GetRequestCancelVisibility(false)==EVisibility::Visible && Panel->GetRequestCancelVisibility(true)==EVisibility::Collapsed);
     Panel->OnCancelClicked();
     TestTrue(TEXT("Cancellation hides both buttons"),Panel->GetRequestCancelVisibility(true)==EVisibility::Collapsed && Panel->GetRequestCancelVisibility(false)==EVisibility::Collapsed);
     Panel->bCancellable=true; Panel->SetBusy(TEXT("Indexing")); Panel->StopBusy();
     TestTrue(TEXT("Completion also removes cancellation"),Panel->GetRequestCancelVisibility(false)==EVisibility::Collapsed);
+    auto* Settings=GetMutableDefault<UGPAAEditorSettings>();
+    const FString SavedProvider=Settings->ChatProvider;
+    Panel->ActiveChatProviderName=TEXT("OpenAI"); Settings->ChatProvider=TEXT("Local");
+    Panel->SetChatResult(true,TEXT(""),TEXT("Answer"),{});
+    TestEqual(TEXT("Changing settings cannot relabel a completed cloud answer as local"),Panel->StatusText->GetText().ToString(),FString(TEXT("Answer complete via OpenAI")));
+    Settings->ChatProvider=SavedProvider;
     return true;
 }
 #endif

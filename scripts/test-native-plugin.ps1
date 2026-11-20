@@ -8,12 +8,32 @@ param(
     [string] $AcceptanceProject,
     [string] $WorkspaceRoot,
     [switch] $InteractiveAssetEditor,
-    [switch] $HttpShutdownAcceptance
+    [switch] $HttpShutdownAcceptance,
+    [switch] $LocalAIAcceptance,
+    [switch] $QuickStartAcceptance,
+    [string] $ReleaseMediaPath,
+    [switch] $LocalOfflineOnly,
+    [string] $LocalModelCache
 )
 $ErrorActionPreference = 'Stop'
+if ($ReleaseMediaPath) {
+    if ($LocalAIAcceptance -or $QuickStartAcceptance -or $HttpShutdownAcceptance -or $AcceptanceProject) { throw 'Media capture must run in isolation.' }
+    $TestFilter='GPAA.Acceptance.ReleaseMedia'
+    $TimeoutSeconds=[Math]::Max($TimeoutSeconds,1800)
+}
+if ($QuickStartAcceptance) {
+    if ($LocalAIAcceptance -or $HttpShutdownAcceptance -or $AcceptanceProject) { throw 'Quick Start acceptance must run in isolation.' }
+    $TestFilter='GPAA.Acceptance.QuickStart'
+}
+if($LocalOfflineOnly -and !$LocalAIAcceptance){throw 'LocalOfflineOnly requires LocalAIAcceptance.'}
 if ($HttpShutdownAcceptance) {
     if ($AcceptanceProject -or $InteractiveAssetEditor) { throw 'HTTP shutdown acceptance must run in isolation.' }
     $TestFilter='GPAA.Acceptance.HttpShutdown'
+}
+if ($LocalAIAcceptance) {
+    if ($HttpShutdownAcceptance -or $AcceptanceProject -or $InteractiveAssetEditor) {throw 'Local AI acceptance must run in isolation.'}
+    $TestFilter='GPAA.Acceptance.LocalAI'
+    $TimeoutSeconds=[Math]::Max($TimeoutSeconds,1200)
 }
 Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
@@ -57,14 +77,39 @@ if ($AcceptanceProject) {
 }
 $editor = Join-Path $UnrealEngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $report = Join-Path $run 'Report'
-$args = @('"' + (Join-Path $projectRoot 'Host.uproject') + '"', '-unattended','-nop4','-nosplash','-nullrhi','-nosound',
-    '-DDC=GPAASmokeDDC','-NoZenAutoLaunch','-ExecCmds="Automation RunTests ' + $TestFilter + '"','-TestExit="Automation Test Queue Empty"',
-    '-ReportExportPath="' + $report + '"','-abslog="' + (Join-Path $run 'Unreal.log') + '"')
-if ($AcceptanceProject) { $args += '-GPAARealAssets' }
-if ($InteractiveAssetEditor) { $args += '-GPAAInteractiveAssetTest' }
-if ($HttpShutdownAcceptance) { $args += '-GPAAHttpShutdownAcceptance' }
+$projectArgument = '"' + (Join-Path $projectRoot 'Host.uproject') + '"'
+$execArgument = '-ExecCmds="Automation RunTests ' + $TestFilter + '"'
+$reportArgument = '-ReportExportPath="' + $report + '"'
+$logArgument = '-abslog="' + (Join-Path $run 'Unreal.log') + '"'
+$editorArguments = @($projectArgument, '-unattended', '-nop4', '-nosplash', '-nullrhi', '-nosound',
+    '-DDC=GPAASmokeDDC', '-NoZenAutoLaunch', $execArgument, '-TestExit="Automation Test Queue Empty"',
+    $reportArgument, $logArgument)
+if ($ReleaseMediaPath) {
+    $editorArguments = @($editorArguments | Where-Object { $_ -ne '-nullrhi' })
+    $releaseCache = (Join-Path $root '.gpaa/release-media/ddc').Replace('\','/')
+    @"
+[GPAAReleaseMediaDDC]
+Root=(Type=KeyLength,Length=120,Inner=AsyncPut)
+AsyncPut=(Type=AsyncPut,Inner=Local)
+Local=(Type=FileSystem,ReadOnly=false,Clean=false,Flush=false,PurgeTransient=true,DeleteUnused=false,Path="$releaseCache")
+"@ | Add-Content -LiteralPath (Join-Path $projectRoot 'Config/DefaultEngine.ini')
+    $editorArguments = @($editorArguments | ForEach-Object { if ($_ -eq '-DDC=GPAASmokeDDC') {'-DDC=GPAAReleaseMediaDDC'} else {$_} })
+    $editorArguments += '-RenderOffscreen'
+    $editorArguments += '-GPAAReleaseMedia'
+    $editorArguments += '-GPAAMediaPath="'+[IO.Path]::GetFullPath($ReleaseMediaPath)+'"'
+}
+if ($AcceptanceProject) { $editorArguments += '-GPAARealAssets' }
+if ($InteractiveAssetEditor) { $editorArguments += '-GPAAInteractiveAssetTest' }
+if ($HttpShutdownAcceptance) { $editorArguments += '-GPAAHttpShutdownAcceptance' }
+if ($QuickStartAcceptance) { $editorArguments += '-GPAAQuickStartAcceptance' }
+if ($LocalAIAcceptance) {
+    if (!$LocalModelCache) {$LocalModelCache=Join-Path $root '.gpaa\local-ai\models'}
+    $editorArguments += '-GPAALocalAcceptance'
+    $editorArguments += '-GPAALocalCache="'+[IO.Path]::GetFullPath($LocalModelCache)+'"'
+    if($LocalOfflineOnly){$editorArguments+='-GPAALocalOfflineOnly'}
+}
 Write-Host "Native smoke evidence: $run"
-$proc = Start-Process $editor -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $run 'stdout.log') -RedirectStandardError (Join-Path $run 'stderr.log')
+$proc = Start-Process $editor -ArgumentList $editorArguments -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $run 'stdout.log') -RedirectStandardError (Join-Path $run 'stderr.log')
 $null = $proc.Handle
 try {
     if (-not $proc.WaitForExit($TimeoutSeconds*1000)) { throw "Native Unreal tests timed out. See $run" }
@@ -74,8 +119,13 @@ try {
     if ($passed -lt 1 -or $result.failed -ne 0 -or $result.notRun -ne 0 -or @($result.tests | Where-Object { $_.state -ne 'Success' -or $_.errors -gt 0 }).Count -gt 0) {
         throw "Native Unreal tests failed. See $report"
     }
-    $requiredTests=@('GPAA.Native.UI.ContextualCancellation','GPAA.Native.Storage.MixedHistoryMigration','GPAA.Native.UI.SegmentedViewSelection','GPAA.Native.UI.SearchScopeRadios','GPAA.Native.Workflow.ScopedAssetSearch','GPAA.Native.UI.PromptBottomAlignment','GPAA.Native.UI.HistoryExclusiveView','GPAA.Native.Workflow.BackgroundIndexNonPreemptive','GPAA.Native.UI.SettingsCredentialActions','GPAA.Native.Cloud.StreamingBoundaries','GPAA.Native.Cloud.HttpContract.Responses','GPAA.Native.Cloud.HttpContract.ChatCompletions','GPAA.Native.Embeddings.Corpus','GPAA.Native.Storage.AtomicRollbackAndHistory','GPAA.Native.Workflow.OfflineIndexAndSearch')
+    $requiredTests=@('GPAA.Native.UI.ContextualCancellation','GPAA.Native.Storage.MixedHistoryMigration','GPAA.Native.UI.SegmentedViewSelection','GPAA.Native.UI.SearchScopeRadios','GPAA.Native.Workflow.ScopedAssetSearch','GPAA.Native.UI.PromptBottomAlignment','GPAA.Native.UI.SetupVisibilityAndNoHistory','GPAA.Native.Workflow.BackgroundIndexNonPreemptive','GPAA.Native.UI.SettingsCredentialActions','GPAA.Native.Cloud.StreamingBoundaries','GPAA.Native.Cloud.HttpContract.Responses','GPAA.Native.Cloud.HttpContract.ChatCompletions','GPAA.Native.Embeddings.Corpus','GPAA.Native.Storage.AtomicRollbackAndHistory','GPAA.Native.Workflow.OfflineIndexAndSearch')
+    $requiredTests+=@('GPAA.Native.LocalAI.EmptyEvidenceGuard','GPAA.Native.LocalAI.StreamingUtf8','GPAA.Native.LocalAI.ModelIntegrity','GPAA.Native.LocalAI.NoCloudFallback','GPAA.Native.LocalAI.PortableProfiles')
+    $requiredTests+='GPAA.Native.Setup.ExplicitProviderChoice'
+    if ($LocalAIAcceptance) { $requiredTests=@('GPAA.Acceptance.LocalAI.DownloadResumeAndGeneration') }
     if ($HttpShutdownAcceptance) { $requiredTests=@('GPAA.Acceptance.HttpShutdown.PendingAndLateRequests') }
+    if ($QuickStartAcceptance) { $requiredTests=@('GPAA.Acceptance.QuickStart.CachedModelAndRealPrompt') }
+    if ($ReleaseMediaPath) { $requiredTests=@('GPAA.Acceptance.ReleaseMedia.CurrentSlatePanel') }
     foreach ($test in $requiredTests) {
         if (@($result.tests | Where-Object { $_.fullTestPath -eq $test -and $_.state -eq 'Success' }).Count -ne 1) { throw "Required native test missing: $test" }
     }

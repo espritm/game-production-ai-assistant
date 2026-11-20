@@ -3,6 +3,7 @@
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 #include "ISettingsModule.h"
+#include "ISettingsSection.h"
 #include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
@@ -47,13 +48,15 @@ void FGPAAssistantModule::StartupModule()
 
     if (ISettingsModule* SettingsModule = FModuleManager::GetModulePtr<ISettingsModule>(TEXT("Settings")))
     {
-        SettingsModule->RegisterSettings(
+        const auto Section = SettingsModule->RegisterSettings(
             TEXT("Project"),
             TEXT("Plugins"),
             TEXT("GameProductionAIAssistant"),
             LOCTEXT("SettingsName", "Game Production AI Assistant"),
             LOCTEXT("SettingsDescription", "Configure local search, cloud chat, personal credentials and portable settings profiles."),
             GetMutableDefault<UGPAAEditorSettings>());
+        if (Section) Section->OnResetDefaults().BindLambda([]()
+        { GetMutableDefault<UGPAAEditorSettings>()->ResetToDefaults(); return true; });
     }
 }
 

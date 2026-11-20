@@ -22,12 +22,14 @@ bool FGPAAHistoryMigrationTest::RunTest(const FString& Parameters)
         FGPAANativeStorage Store(Path);
         TestTrue(TEXT("Upgrade opens existing history"),Store.IsReady(Error));
         TestTrue(TEXT("Old prompt retained after migration"),Store.History(Error).Contains(TEXT("Old answer")));
+        TestTrue(TEXT("Local prompt preserves provider/model identity"), Store.AddHistory(TEXT("Local question"), TEXT("Local answer"), true, Error, TEXT("[]"), TEXT("Prompt"), TEXT("All"), TEXT("Local"), TEXT("qwen-fixture")));
         TestTrue(TEXT("Search entry writes query, scope and references"),Store.AddHistory(TEXT("pistol reload"),TEXT("1 result(s)."),true,Error,TEXT("[\"asset:/Game/Pistol.Pistol\"]"),TEXT("Search"),TEXT("Assets")));
         TestTrue(TEXT("Empty search is recorded too"),Store.AddHistory(TEXT("no match"),TEXT("0 result(s)."),true,Error,TEXT("[]"),TEXT("Search"),TEXT("Code")));
     }
     {
         FGPAANativeStorage Reopened(Path);
         const FString History=Reopened.History(Error);
+        TestTrue(TEXT("Local model identity survives migration and reopen"), History.Contains(TEXT("Provider: Local | Model: qwen-fixture")));
         TestTrue(TEXT("Prompts distinguish their kind"),History.Contains(TEXT("[Prompt]")));
         TestTrue(TEXT("Search scope and query survive reopen"),History.Contains(TEXT("[Search — Asset]")) && History.Contains(TEXT("pistol reload")));
         TestTrue(TEXT("Search references persist"),History.Contains(TEXT("asset:/Game/Pistol.Pistol")));
