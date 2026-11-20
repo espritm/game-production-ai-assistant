@@ -37,3 +37,14 @@ Build progress is in the private build repository's Actions page; the source job
 The runner's Network Service account is retained. Do not grant it interactive-user credentials. Before approving new main code, review workflow/script changes with the same care as executable code. Keep the private build repository private and restrict its writers. If public untrusted native builds become necessary, provision a separate disposable build machine rather than reconnecting this runner to public PRs.
 
 For a maintainer acceptance run before the first real tag, manually dispatch the private workflow with the reviewed main SHA, the matching version tag name and `dry_run=true`. The workflow creates a tag only inside its disposable source checkout; it does not push a GitHub tag or publish downloads. The single private runner serializes native builds without dropping pending versions through a shared workflow concurrency group.
+
+### Windows runner service troubleshooting
+
+On localized Windows installations, inspect the service account if startup fails with error 1068. Windows service configuration requires the canonical `NT AUTHORITY\NetworkService` name, even if account lookup displays a translated name. From an administrator PowerShell, repair only the GPAA service and start it:
+
+```powershell
+sc.exe config "actions.runner.espritm-gpaa-unreal-builds.GPAA_Private_Unreal" obj= "NT AUTHORITY\NetworkService"
+Start-Service -Name 'actions.runner.espritm-gpaa-unreal-builds.GPAA_Private_Unreal'
+```
+
+This retains the limited Network Service identity. The trusted workflow sets `-ExecutionPolicy Bypass` only for its PowerShell processes; it does not change machine execution policy. See [Microsoft's account naming requirement](https://learn.microsoft.com/windows/win32/services/networkservice-account).

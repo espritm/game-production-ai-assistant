@@ -33,7 +33,7 @@ The gallery UI preview is rendered from compiled Slate widgets offscreen using a
 
 MIT is retained for original code. Third-party licenses and Unreal terms remain separate. The source repository remains private until an explicit visibility change; private GitHub URLs are not public customer download links.
 
-The original runner has been unregistered from the source repository. The release design uses hosted public/source checks and a separate private build controller. Completing the Windows service transfer and recording the two limited tokens described in `releasing.md` are required before claiming the tag pipeline is operational. The private acceptance workflow supports a dry run without creating a GitHub tag or publishing a release.
+The original runner has been unregistered from the source repository. The release design uses hosted public/source checks and a separate private build controller. The Windows service transfer is complete and the two limited secrets described in `releasing.md` are registered. The private runner successfully built and validated both engines in [dry run 44816919284](https://github.com/espritm/gpaa-unreal-builds/actions/runs/44816919284) on 20 November 2026, using source commit `26e70a1574dcbe6c309e18687bf9bec1444895cc`. Both sets of 30 native tests, HTTP shutdown, startup/minute indexing and distribution policy checks passed; the Fab dossier and SHA256 manifest were generated. The run intentionally skipped release uploads and created no GitHub tag. The source tag dispatch secret is registered; its use and actual upload permissions will first be exercised by a real release request.
 
 ## Portal actions still separate
 
