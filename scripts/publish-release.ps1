@@ -21,8 +21,6 @@ foreach ($entry in $manifest.files) {
 if ($assets.Count -ne 6) { throw 'Expected four engine ZIPs, one Fab dossier and the hash manifest.' }
 $remoteCommit = gh api "repos/$Repository/commits/$Tag" --jq .sha
 if ($LASTEXITCODE -ne 0 -or $remoteCommit -ne $ExpectedCommit) { throw 'Remote tag changed or could not be verified; nothing was published.' }
-$remoteCommit = gh api "repos/$Repository/commits/$Tag" --jq .sha
-if ($LASTEXITCODE -ne 0 -or $remoteCommit -ne $ExpectedCommit) { throw 'Remote tag changed or could not be verified; nothing was published.' }
 $existing = gh api "repos/$Repository/releases/tags/$Tag" 2>$null | ConvertFrom-Json
 if ($LASTEXITCODE -eq 0) {
     if (!$existing.draft) { throw 'Published releases are immutable; create a new version instead.' }
