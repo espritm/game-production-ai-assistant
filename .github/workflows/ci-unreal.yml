@@ -19,3 +19,6 @@ jobs:
           ./scripts/tests/public-source-policy.Tests.ps1
           ./scripts/tests/release-ref.Tests.ps1
           ./scripts/tests/publish-release.Tests.ps1
+      - name: Check native stderr handling on Windows PowerShell 5
+        shell: powershell
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/publish-release.Tests.ps1
