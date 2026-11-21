@@ -26,6 +26,7 @@ $global:GPAAPublishTestPublished = $false
 $global:GPAAPublishTestUploadFailure = $false
 $global:GPAAPublishTestRemoteMoved = $false
 $global:GPAAPublishTestMissing = $true
+$global:GPAAPublishTestLookupFailure = $false
 function global:gh {
     $call = @($args)
     $global:GPAAPublishTestCalls += ($call -join ' ')
@@ -35,7 +36,16 @@ function global:gh {
         return $global:GPAAPublishTestFixtureCommit
     }
     if ($call[0] -eq 'api') {
-        if ($global:GPAAPublishTestMissing) { $global:LASTEXITCODE = 1; return }
+        if ($global:GPAAPublishTestLookupFailure) {
+            & $env:ComSpec /d /c 'echo gh: Forbidden (HTTP 403) 1>&2 & exit /b 1'
+            $global:LASTEXITCODE = 1
+            return
+        }
+        if ($global:GPAAPublishTestMissing) {
+            & $env:ComSpec /d /c 'echo gh: Not Found (HTTP 404) 1>&2 & exit /b 1'
+            $global:LASTEXITCODE = 1
+            return
+        }
         return ('{"draft":' + (!$global:GPAAPublishTestPublished).ToString().ToLower() + '}')
     }
     if ($call[1] -eq 'create') { $global:GPAAPublishTestMissing = $false }
@@ -55,6 +65,10 @@ try {
     Invoke-Publisher
     if (@($global:GPAAPublishTestCalls | Where-Object { $_ -like 'release create*' }).Count -ne 1) { throw 'First publication did not create a draft.' }
     if (@($global:GPAAPublishTestCalls | Where-Object { $_ -like 'release edit*' }).Count -ne 1) { throw 'Complete release was not published.' }
+    $global:GPAAPublishTestLookupFailure = $true
+    Assert-PublishRejected
+    if (@($global:GPAAPublishTestCalls | Where-Object { $_ -like 'release create*' -or $_ -like 'release upload*' }).Count) { throw 'A lookup failure must not create or upload a release.' }
+    $global:GPAAPublishTestLookupFailure = $false
     $global:GPAAPublishTestPublished = $true
     Assert-PublishRejected
     $global:GPAAPublishTestPublished = $false; $global:GPAAPublishTestUploadFailure = $true
@@ -68,6 +82,7 @@ try {
     Remove-Item Function:\gh -ErrorAction SilentlyContinue
     Remove-Variable GPAAPublishTestFixtureCommit,GPAAPublishTestCalls,GPAAPublishTestPublished,GPAAPublishTestUploadFailure,GPAAPublishTestRemoteMoved -Scope Global -ErrorAction SilentlyContinue
     Remove-Variable GPAAPublishTestMissing -Scope Global -ErrorAction SilentlyContinue
+    Remove-Variable GPAAPublishTestLookupFailure -Scope Global -ErrorAction SilentlyContinue
 }
 $global:LASTEXITCODE = 0
 Write-Host 'PASS mocked release publication: complete upload, immutable published release, upload failure, moved tag and tampered payload.'
